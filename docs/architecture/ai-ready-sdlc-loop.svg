@@ -1,0 +1,116 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 627" width="1200" height="627" role="img" aria-labelledby="title desc">
+  <title id="title">AI-Ready SDLC — the loop</title>
+  <desc id="desc">Six-stage horizontal flow showing the AI-ready software development life cycle: Decision, Spec, Generate, Verify, Ship, Audit, with a feedback loop returning to Decision.</desc>
+
+  <defs>
+    <style>
+      .bg          { fill: #F5F7FA; }
+      .hairline    { stroke: #D6DCE5; stroke-width: 1; fill: none; }
+      .node-stroke { stroke: #1976D2; stroke-width: 2.5; fill: none; }
+      .node-fill   { fill: #FFFFFF; }
+      .arrow       { stroke: #1976D2; stroke-width: 2.5; fill: none; }
+      .arrow-head  { fill: #1976D2; }
+      .label       { fill: #1A2332; font-family: "Inter", "Helvetica Neue", system-ui, sans-serif; font-weight: 600; font-size: 22px; text-anchor: middle; }
+      .step        { fill: #1976D2; font-family: "Inter", "Helvetica Neue", system-ui, sans-serif; font-weight: 700; font-size: 12px; letter-spacing: 0.18em; text-anchor: middle; }
+      .headline    { fill: #0F1B2D; font-family: "Inter", "Helvetica Neue", system-ui, sans-serif; font-weight: 800; font-size: 44px; letter-spacing: 0.14em; text-anchor: start; }
+      .subhead     { fill: #5A6B85; font-family: "Inter", "Helvetica Neue", system-ui, sans-serif; font-weight: 400; font-size: 20px; text-anchor: start; }
+      .footer      { fill: #8A98AE; font-family: "Inter", "Helvetica Neue", system-ui, sans-serif; font-weight: 500; font-size: 14px; letter-spacing: 0.08em; }
+      .loop-label  { fill: #5A6B85; font-family: "Inter", "Helvetica Neue", system-ui, sans-serif; font-weight: 600; font-size: 14px; letter-spacing: 0.12em; text-anchor: middle; font-style: italic; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,5 L0,10 Z" class="arrow-head"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="627" class="bg"/>
+
+  <!-- Subtle border -->
+  <rect x="40" y="40" width="1120" height="547" rx="6" class="hairline"/>
+
+  <!-- Headline -->
+  <text x="80" y="120" class="headline">AI-READY SDLC</text>
+  <text x="80" y="160" class="subhead">The loop that separates &#x201C;using AI&#x201D; from &#x201C;building with AI.&#x201D;</text>
+
+  <!-- Nodes — 6 stages, evenly spaced -->
+  <!-- Node width 145, height 70, gap ~25 between them. Total flow width = 6*145 + 5*25 = 995. Centered: x = (1200-995)/2 = 102.5 ~ 100. -->
+  <!-- Y center: 340. Node top: 305. -->
+
+  <!-- Node 1: Decision -->
+  <g>
+    <rect x="100" y="305" width="145" height="70" rx="8" class="node-fill"/>
+    <rect x="100" y="305" width="145" height="70" rx="8" class="node-stroke"/>
+    <text x="172.5" y="332" class="step">01</text>
+    <text x="172.5" y="358" class="label">Decision</text>
+  </g>
+
+  <!-- Arrow 1 -->
+  <line x1="250" y1="340" x2="265" y2="340" class="arrow" marker-end="url(#arrowhead)"/>
+
+  <!-- Node 2: Spec -->
+  <g>
+    <rect x="270" y="305" width="145" height="70" rx="8" class="node-fill"/>
+    <rect x="270" y="305" width="145" height="70" rx="8" class="node-stroke"/>
+    <text x="342.5" y="332" class="step">02</text>
+    <text x="342.5" y="358" class="label">Spec</text>
+  </g>
+
+  <!-- Arrow 2 -->
+  <line x1="420" y1="340" x2="435" y2="340" class="arrow" marker-end="url(#arrowhead)"/>
+
+  <!-- Node 3: Generate -->
+  <g>
+    <rect x="440" y="305" width="145" height="70" rx="8" class="node-fill"/>
+    <rect x="440" y="305" width="145" height="70" rx="8" class="node-stroke"/>
+    <text x="512.5" y="332" class="step">03</text>
+    <text x="512.5" y="358" class="label">Generate</text>
+  </g>
+
+  <!-- Arrow 3 -->
+  <line x1="590" y1="340" x2="605" y2="340" class="arrow" marker-end="url(#arrowhead)"/>
+
+  <!-- Node 4: Verify -->
+  <g>
+    <rect x="610" y="305" width="145" height="70" rx="8" class="node-fill"/>
+    <rect x="610" y="305" width="145" height="70" rx="8" class="node-stroke"/>
+    <text x="682.5" y="332" class="step">04</text>
+    <text x="682.5" y="358" class="label">Verify</text>
+  </g>
+
+  <!-- Arrow 4 -->
+  <line x1="760" y1="340" x2="775" y2="340" class="arrow" marker-end="url(#arrowhead)"/>
+
+  <!-- Node 5: Ship -->
+  <g>
+    <rect x="780" y="305" width="145" height="70" rx="8" class="node-fill"/>
+    <rect x="780" y="305" width="145" height="70" rx="8" class="node-stroke"/>
+    <text x="852.5" y="332" class="step">05</text>
+    <text x="852.5" y="358" class="label">Ship</text>
+  </g>
+
+  <!-- Arrow 5 -->
+  <line x1="930" y1="340" x2="945" y2="340" class="arrow" marker-end="url(#arrowhead)"/>
+
+  <!-- Node 6: Audit -->
+  <g>
+    <rect x="950" y="305" width="145" height="70" rx="8" class="node-fill"/>
+    <rect x="950" y="305" width="145" height="70" rx="8" class="node-stroke"/>
+    <text x="1022.5" y="332" class="step">06</text>
+    <text x="1022.5" y="358" class="label">Audit</text>
+  </g>
+
+  <!-- Feedback loop: from Audit bottom (1022, 375) down, then left, then up to Decision bottom (172, 375) -->
+  <path d="M 1022.5 375
+           L 1022.5 470
+           Q 1022.5 490 1002.5 490
+           L 192.5 490
+           Q 172.5 490 172.5 470
+           L 172.5 388"
+        class="arrow" marker-end="url(#arrowhead)"/>
+
+  <!-- Loop label -->
+  <text x="597.5" y="513" class="loop-label">Every cycle re-enters with what the audit taught.</text>
+
+  <!-- Footer attribution -->
+  <text x="1120" y="565" class="footer" text-anchor="end">armando.musto / caseflow-ai</text>
+</svg>
