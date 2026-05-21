@@ -23,9 +23,9 @@ elapsed time depends on focus and velocity.
 
 ## Current state
 
-**Today:** 2026-05-20 — **P1.9 shipping. Phase 1 closing at 9/9.** Demo seed harness produces 3 tenants, 30 users (10 per tenant across ADMIN/ENGINEER/CUSTOMER/PENDING_APPROVAL), and 105 cases (35 per tenant across statuses/priorities/ages/assignees), all keyed off deterministic UUIDs so the seed IS its own idempotency mechanism — re-running wipes seed-owned rows by exact ID and re-inserts. Local + RDS targets via `scripts/dev.sh demo:seed [--target=local|rds]`; the RDS path reuses the proven temp-public-access pattern from `db:promote-rds`. Decision log carries 26 pre-flights + 11 mid-flights.
-**Active scope:** 8 / 82 sub-phases shipped (P1.8 verified locally; deploy pending). P1 (Multi-tenancy + Real Auth) is 🚧 — one sub-phase remains (P1.9 Demo seed harness). P10 (Cloud infrastructure — dev) is 🚧 — dev environment is live but a few sub-phases (ai_worker, events, formal e2e, cost guardrails) remain. Recommended order: **P1.8 deploy → P1.9 → P2**, with P10 housekeeping woven in just before P7.
-**Last shipped:** **P1.9 — Demo seed harness (deterministic, idempotent, multi-tenant).** Hand-curated dataset produces realistic content for screenshots + drivable demo at caseflow.musto.io. Backend `seed/` module under `backend/src/seed/` exposes `SeedService.seedDemo()` via a CLI entrypoint (`yarn db:seed:demo`), DI-resolved through a standalone Nest application context. Deterministic UUIDs derived from `(SEED_VERSION, ...parts)` via a manual UUID v5 implementation (zero external deps) ARE the idempotency mechanism — same hashing that names a row IS what lets the seeder identify-and-wipe its own data. 23 unit tests pinned the seed contract including 3 pinned-UUID regression assertions that catch any modification to the v5 implementation at CI time. Three `scripts/dev.sh` subcommands wrap the workflow: `demo:seed [--target=local|rds]`, `demo:reset`, `demo:credentials`. RDS path reuses the proven temp-public-access pattern from `db:promote-rds` (trap-cleanup on EXIT/INT/TERM guarantees revert). Defense-in-depth production guards: `--target=rds` requires confirmation, `SeedService` refuses with `NODE_ENV=production`, only the dev account has the RDS instance the script targets. **Phase 1 closes at 9/9.** Decision log: 26 pre-flights, 11 mid-flights, every architectural choice + reversal captured. Deployed environment is now demo-ready — register-and-approve flow ready to onboard LinkedIn audience.
+**Today:** 2026-05-21 — **Phase 1 closed at 9/9. v0.1.0 tagged. Public showcase repo live.** P1's feature branch merged to main on 2026-05-20; v0.1.0 carries the demo-ready deployed environment (caseflow.musto.io). The public methodology surface stood up alongside the tag at [github.com/amusto/caseflow-ai-showcase](https://github.com/amusto/caseflow-ai-showcase) — README, ROADMAP, decision log, dev-ready specs, AI-Ready SDLC graphic, Article 01, screenshots, LICENSE (CC BY 4.0). The split between the private implementation repo and the public showcase is itself captured as Pre-flight 27 in the Phase 1 decision log. Article 01 (*AI-Ready SDLC — the kickoff*) shipped on LinkedIn 2026-05-20; the publishing pipeline carries Articles 02-13 on a roughly weekly cadence from Tuesday 2026-05-26 forward. Decision log carries 27 pre-flights + 11 mid-flights.
+**Active scope:** 9 / 76 core sub-phases shipped (12%). P1 (Multi-tenancy + Real Auth) is ✅ at 9/9. P2 (Admin section + Customer model) is ⬜ — P2.1 dev-ready spec drafted (`sdlc-roadmap-requirements/docs/tasks/dev-ready/p2-1-admin-section-foundation.md`); Pre-flights 1-4 captured in the new `docs/decisions/phase-02-admin-and-personalization.md` log. P10 (Cloud infrastructure — dev) is 🚧 — dev environment is live (ECS + RDS + ALB + CloudFront + S3) but a few sub-phases (ai_worker, events, formal e2e, cost guardrails) remain; recommended to weave in just before P7. **Recommended order: P2.1 implementation → P2.2 spec + implementation → P2.3+ (customer model)**, with the rest of P2 building on top.
+**Last shipped:** **Phase 1 close-out (2026-05-20 → 2026-05-21).** Sequenced: P1.7 (tour engine) → P1.8 (Engineer Dashboard MVP) → P1.9 (demo seed harness) → feature-branch merge to main → screenshots in root README → v0.1.0 tag → showcase repo published. The Engineer Dashboard's widget-registry composition primitive (P1.8's `{ id, title, audience, Component }` contract) carries forward as a reusable composition pattern; P2.1 reuses it for the admin section, validating the registry-as-architectural-payoff claim. The deterministic demo seed harness (P1.9) produces 3 tenants × 30 users × 105 cases via manual UUID v5 hashing — the same hashing names rows AND identifies them for wipe-and-reinsert, making the seed its own idempotency mechanism. Defense-in-depth production guards (CLI confirmation, `NODE_ENV=production` refusal, dev-account-only RDS) keep the seeder safe across all targets. Pre-flight 27 (Showcase repo pattern over fully-public main repo) ties the close-out together: implementation stays private; methodology surface (ROADMAP, decisions, specs, articles, screenshots) goes public via the showcase repo. The 5-minute "sync methodology artifacts" ritual at each phase close-out keeps the showcase fresh without polishing-for-public on every implementation commit.
 **Cost reminder:** Dev environment is live on AWS — ECS Fargate (1 task, 0.25 vCPU / 512 MB), RDS db.t4g.micro Postgres, ALB, CloudFront, S3 SPA bucket. ~$30-50/month at idle. Tear down with `terragrunt destroy` in each `infra/live/dev/*` stack if not actively demoing.
 
 ---
@@ -81,7 +81,7 @@ gantt
     section Foundation
     P1 Multi-tenancy + Real Auth     :         p1, 2026-05-16, 5d
     section Domain
-    P2 Customer model                :         p2, after p1, 3d
+    P2 Admin section + Customer model :        p2, after p1, 4d
     P3 Activity + audit              :         p3, after p2, 3d
     P4 Attachments                   :         p4, after p3, 2d
     P5 Workflow + SLA + escalation   :         p5, after p4, 3d
@@ -108,7 +108,7 @@ view: progress isn't just "code shipped" — it's "contract clauses honored."
 
 | Phase | Status | CLAUDE.md operating principles satisfied | CLAUDE.md "Do Not" rules satisfied | Notes |
 |---|---|---|---|---|
-| P1  | 🚧 | #4 (DTO/validation at auth boundary), #5 (no bypassing authorization or role checks) | #1 (no silently weakening validation), #3 (no hard-coded secrets — JWT/OAuth secrets from env), #4 (no global mutable state in tenant context) | Foundational: every later phase inherits tenant scoping |
+| P1  | ✅ | #4 (DTO/validation at auth boundary), #5 (no bypassing authorization or role checks) | #1 (no silently weakening validation), #3 (no hard-coded secrets — JWT/OAuth secrets from env), #4 (no global mutable state in tenant context) | Foundational: every later phase inherits tenant scoping |
 | P2  | ⬜ | #4 (DTO validation on customer endpoints) | #5 (no skipping error handling on orphan-customer business rule) | Cases now FK to customer org |
 | P3  | ⬜ | #4 (DTO for notes; visibility validated at boundary), #6 (tests for note RBAC) | #1 | Internal-vs-customer-visible enforced server-side |
 | P4  | ⬜ | #4 (file-type/size validation), #6 | #1, #3 (S3 creds via env or IAM role) | Local dev uses MinIO/filesystem; real S3 lands in P10 |
@@ -142,8 +142,8 @@ satisfied by an earlier phase, later phases inherit and must not violate it.
 
 | # | Phase | Status | Primary deliverable | Decision log |
 |---|---|---|---|---|
-| 1  | Multi-tenancy + Real Auth foundation | 🚧 (4/6) | ✅ Tenant entity · ✅ real auth (bcrypt + JWT + refresh tokens + admin approval + default tenant) · ⬜ Google OAuth + JIT · ✅ MockUserGuard → JwtAuthGuard + ActiveUserGuard · ✅ tenant-scoped queries · ⬜ frontend login | [`docs/decisions/phase-01-multi-tenancy-auth.md`](docs/decisions/phase-01-multi-tenancy-auth.md) |
-| 2  | Customer model | ⬜ | CustomerOrganization + CustomerContact entities · cases FK to customer org · customer CRUD endpoints · frontend customer list/detail | _pending_ |
+| 1  | Multi-tenancy + Real Auth foundation | ✅ (9/9) | ✅ Tenant entity · ✅ real auth (bcrypt + JWT + refresh tokens + admin approval + default tenant) · ✅ Google OAuth + JIT · ✅ JwtAuthGuard + ActiveUserGuard (global) · ✅ tenant-scoped queries · ✅ frontend login + session bootstrap · ✅ tour engine · ✅ Engineer Dashboard MVP · ✅ demo seed harness | [`docs/decisions/phase-01-multi-tenancy-auth.md`](docs/decisions/phase-01-multi-tenancy-auth.md) |
+| 2  | Admin section + Customer model | ⬜ | `/admin` route + widget-registry reuse · `PendingApprovalUsers` widget · admin notification on registration (Resend) · `CustomerOrganization` + `CustomerContact` entities · cases FK to customer org · customer CRUD endpoints · frontend customer list/detail | [`docs/decisions/phase-02-admin-and-personalization.md`](docs/decisions/phase-02-admin-and-personalization.md) |
 | 3  | Activity, collaboration, audit | ⬜ | Notes (internal vs customer-visible) · extended timeline · compliance-grade AuditLog table · frontend timeline + note composer | _pending_ |
 | 4  | Attachments & documents | ⬜ | Attachment entity · presigned-URL flow · local-dev MinIO/filesystem (real S3 deferred to P10) · upload UI | _pending_ |
 | 5  | Workflow engine: status, SLA, escalation | ⬜ | Status state machine · SLA clock + breach detection · data-driven escalation rules · frontend SLA badge | _pending_ |
@@ -216,6 +216,7 @@ a different tenant. Frontend gets a real login.
 24. Engineer Dashboard = widget-registry composition at `/` route, MVP ships `myOpenCases` + `recentActivity` + `quickActions` (P1.8). Each subsequent phase adds widgets.
 25. Demo seed = deterministic, idempotent, multi-tenant; entry points `yarn db:seed:demo` + `dev.sh demo:seed`; refuses to run with `NODE_ENV=production` (P1.9).
 26. User identity display fields (`name`, `email`) ride as additional JWT claims rather than a separate `/users/me` endpoint — Path A from the JWT-vs-fetch trade-off, defensible for a portfolio MVP. Revisit when profile data grows past name/email or regulatory context demands PII off-token (P1.8 follow-on).
+27. **Showcase repo pattern over fully-public main repo.** Implementation repo (`caseflow-ai`) stays private; curated public companion at [`caseflow-ai-showcase`](https://github.com/amusto/caseflow-ai-showcase) carries the methodology surface — ROADMAP, decision log, dev-ready specs, AI-Ready SDLC graphic, articles as they ship, screenshots. The split mirrors how serious orgs share design docs and postmortems without exposing source. A 5-minute "sync methodology artifacts" ritual at each phase close-out keeps the showcase fresh. Rejects (a) fully-public main repo (audience reads READMEs and decisions, not `git log`; senior engineers are evaluated on judgment, not code style) and (b) a day-one `docs/patterns/` excerpts folder in the showcase (deferred — revisit if recruiters consistently ask "can I see a representative code shape?") (P1 close-out, 2026-05-21).
 
 **Mid-flight reversals/fixes captured in the same log:**
 
@@ -235,12 +236,19 @@ a different tenant. Frontend gets a real login.
 
 **Where to look:**
 
-- [`docs/decisions/phase-01-multi-tenancy-auth.md`](docs/decisions/phase-01-multi-tenancy-auth.md)
+- [`docs/decisions/phase-01-multi-tenancy-auth.md`](docs/decisions/phase-01-multi-tenancy-auth.md) — 27 pre-flights + 11 mid-flights, every architectural choice + reversal captured
 - [`sdlc-roadmap-requirements/docs/tasks/dev-ready/p1-1-tenant-entity.md`](sdlc-roadmap-requirements/docs/tasks/dev-ready/p1-1-tenant-entity.md)
 - [`sdlc-roadmap-requirements/docs/tasks/dev-ready/p1-2-user-auth.md`](sdlc-roadmap-requirements/docs/tasks/dev-ready/p1-2-user-auth.md)
+- [`sdlc-roadmap-requirements/docs/tasks/dev-ready/p1-3-google-oauth.md`](sdlc-roadmap-requirements/docs/tasks/dev-ready/p1-3-google-oauth.md)
 - [`sdlc-roadmap-requirements/docs/tasks/dev-ready/p1-4-jwt-auth-guard.md`](sdlc-roadmap-requirements/docs/tasks/dev-ready/p1-4-jwt-auth-guard.md)
 - [`sdlc-roadmap-requirements/docs/tasks/dev-ready/p1-5-tenant-scoped-cases.md`](sdlc-roadmap-requirements/docs/tasks/dev-ready/p1-5-tenant-scoped-cases.md)
-- [`scripts/dev.sh`](scripts/dev.sh) — full-stack smoke test for the P1.1-P1.5 surface.
+- [`sdlc-roadmap-requirements/docs/tasks/dev-ready/p1-6-frontend-login.md`](sdlc-roadmap-requirements/docs/tasks/dev-ready/p1-6-frontend-login.md)
+- [`sdlc-roadmap-requirements/docs/tasks/dev-ready/p1-7-tour-infrastructure.md`](sdlc-roadmap-requirements/docs/tasks/dev-ready/p1-7-tour-infrastructure.md)
+- [`sdlc-roadmap-requirements/docs/tasks/dev-ready/p1-8-engineer-dashboard.md`](sdlc-roadmap-requirements/docs/tasks/dev-ready/p1-8-engineer-dashboard.md)
+- [`sdlc-roadmap-requirements/docs/tasks/dev-ready/p1-9-demo-seed-harness.md`](sdlc-roadmap-requirements/docs/tasks/dev-ready/p1-9-demo-seed-harness.md)
+- [`scripts/dev.sh`](scripts/dev.sh) — full-stack smoke test + demo seed wrappers
+- [Live demo](https://caseflow.musto.io) — register-and-approve flow
+- [Public showcase repo](https://github.com/amusto/caseflow-ai-showcase) — methodology surface (ROADMAP, decisions, specs, articles, screenshots)
 
 ---
 
@@ -274,10 +282,16 @@ The two themes are sequenced — Admin section lands first so subsequent custome
 
 **Dependencies:** P1 (tenant scoping, user approval flow, widget-registry pattern, deployed env) complete.
 
-**Open architectural calls (resolve in P2.1 / P2.2 specs):**
+**Resolved architectural calls** (Pre-flights 1-4 in [`docs/decisions/phase-02-admin-and-personalization.md`](docs/decisions/phase-02-admin-and-personalization.md)):
 
-- **Admin routing** — `/admin` as a parallel route at the top level, OR `/admin/*` as a section with its own sub-routes from day one? Recommendation: `/admin` for now, expand to `/admin/users`, `/admin/customers`, etc. when there's more than one widget worth a dedicated page.
-- **Notification transport** — Resend (free tier, fast setup, ~4hr) vs SES (production-grade, DNS dance, ~14hr, deferred to P12). Recommendation: Resend now, SES at P12 prod hardening.
+- **Admin section composition** (Pre-flight 2) — reuse the P1.8 widget-registry primitive. Two parallel registries (`dashboardWidgets`, `adminWidgets`) share the `Widget` contract; `<AdminSection />` mirrors `<Dashboard />`'s structure. Rejects a generic `<WidgetPage registry={...} />` shell (premature deduplication) and a single combined `allWidgets` array (conflates surfaces).
+- **Admin routing** (Pre-flight 3) — `/admin` is a single route now. Defer `/admin/*` sub-routes until widget count crosses ~5 or a single widget grows complex enough to need its own URL.
+- **Role gating** (Pre-flight 4) — new `<RequireRole role="ADMIN" />` outlet wrapper in `frontend/src/routes/`, alongside `<RequireAuth />` and `<RequireActiveAuth />`. Route-level gate, not runtime switch — `/admin` is admin-only, not role-dispatched. Reusable for future role-gated routes.
+- **Dashboard drag-and-drop direction** (Pre-flight 1, forward-looking) — when personalization lands as a P2.5-ish sub-phase: dnd-kit sortable reorder first; `react-grid-layout` resize deferred to user demand; dedicated `dashboard_layouts` table over a shared `user_preferences` JSON blob.
+
+**Open architectural calls (resolve before P2.2 / P2.3 specs):**
+
+- **Notification transport** — Resend (free tier, fast setup, ~4hr) vs SES (production-grade, DNS dance, ~14hr, deferred to P12). Recommendation: Resend now, SES at P12 prod hardening. Lock in as a Pre-flight when the P2.2 spec lands.
 - **Customer-facing emails** — deferred to a post-P2.2 evaluation point. Decide based on whether the register-and-approve flow surfaces a real need.
 
 ---
