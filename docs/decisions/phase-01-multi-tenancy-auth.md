@@ -1647,6 +1647,107 @@ when fetch-time semantics actually matter.** For the current scope,
 
 ---
 
+## Pre-flight 27 — Showcase repo pattern over fully-public main repo (P1 close-out)
+
+**Date:** 2026-05-21 (P1 close-out, alongside the v0.1.0 tag).
+
+**Decision.** Keep the implementation repo (`caseflow-ai`) **private**.
+Build a curated public companion at
+[`caseflow-ai-showcase`](https://github.com/amusto/caseflow-ai-showcase)
+that contains only the methodology surface: the ROADMAP, the decision
+log, the dev-ready specs, the AI-Ready SDLC graphic, the long-form
+articles as they ship, and 3–4 screenshots of the deployed product.
+The showcase repo's `README.md` is the portfolio hero; the private
+repo's `README.md` reverts to a developer-onboarding shape (quick
+start, helper scripts, "where to start reading" for internal devs).
+
+**Alternative rejected — fully public main repo.** The default
+engineering-portfolio move is to flip the whole thing public on day
+one. The reasoning is "anyone should be able to clone and verify the
+code." Three problems with that for this project:
+
+1. **The audience doesn't operate that way.** Recruiters and
+   engineering leaders don't clone repos — they read READMEs, scan
+   roadmaps, look at architectural decisions. Optimizing for
+   clone-and-verify burns effort the audience never uses.
+2. **Senior engineers are evaluated on judgment, not code quality.**
+   Which problems got chosen, what was cut, where the team reversed
+   course, how it got documented. The methodology artifacts carry
+   that signal at far higher density than `git log --all -p`.
+3. **The implementation repo carries operational metadata that
+   shouldn't be public.** Account IDs in Terraform outputs, RDS
+   endpoints, S3 bucket names, internal scripts (`./scripts/dev.sh`,
+   `./scripts/deploy.sh`) that assume specific AWS account access.
+   Sanitizing all of that to publish-grade adds toil at every commit.
+
+**Alternative rejected — third-tier public excerpts folder
+(`docs/patterns/`) from day one.** Considered carving curated 10–20
+line code excerpts (widget registry contract, role-gate-inside-the-
+engine, RTK `condition` pattern, deterministic UUIDs, Terragrunt
+layering) into a `docs/patterns/` folder in the showcase. Decided
+against shipping it in the P1 close-out drop because:
+
+- It risks blurring the line between "methodology surface" and
+  "partial source dump"
+- The patterns are most legible when paired with the surrounding
+  context (modules, types, tests), which the excerpts can't carry
+- The decision log already cites the relevant files by path, so the
+  excerpts add less signal than they imply
+
+Deferred to a Phase 2 close-out update if recruiters or engineering
+leaders consistently ask "can I see a representative code shape?".
+
+**Why this works.**
+
+- **Mirrors real production codebases.** Serious orgs keep their
+  source private; methodology + architectural artifacts are what
+  they share externally (design docs, postmortems, conference talks).
+- **The split shows judgment, not just output.** The fact that there
+  *is* a deliberate split, with reasoning, is itself a signal. A
+  recruiter or hiring manager who reads this entry has already learned
+  something about how I think.
+- **Lower toil per phase close-out.** A 5-minute "sync the
+  methodology artifacts" ritual at each phase close-out keeps the
+  showcase fresh; the implementation repo doesn't have to be polished
+  for public consumption on every commit.
+- **The live demo carries the verifiability burden.** Anyone can
+  register at `caseflow.musto.io`, get approved, and drive the
+  product — that's a stronger validation of "the code works" than
+  any clone-and-build dance.
+
+**Revisit if.**
+
+1. Recruiters or engineering leaders consistently ask for code
+   access — would suggest the methodology artifacts aren't carrying
+   the signal and the excerpts folder needs to land.
+2. The methodology artifacts get stale because the implementation
+   has drifted — would suggest tightening the phase-close-out sync
+   ritual or automating it.
+3. A future phase produces a pattern compelling enough on its own
+   that it deserves a runnable public demo (e.g., a self-contained
+   library or pattern repo) — would be additive to the showcase,
+   not a replacement.
+
+**Files touched at decision time.**
+
+- `caseflow-ai/README.md` — reverted to developer-onboarding shape
+  (private-repo-internal audience); links to the showcase repo in
+  three places for anyone with read access who wants the public-
+  facing context
+- `caseflow-ai/docs/screenshots/` — source-of-truth screenshots
+  staged for the showcase (copied via SETUP.md ritual)
+- `caseflow-ai-showcase/` (new public repo) — hero README, ROADMAP,
+  decision log, specs, architecture, Article 01, 3 screenshots,
+  LICENSE (CC BY 4.0)
+- `publishing/showcase-repo-draft/` — staging folder used to compose
+  the initial drop; retired after the live repo went up
+- `publishing/demo-invitation-language.md` — three forms (long /
+  medium / short) of the "register + DM me" demo invitation,
+  reused across the showcase README, Article 01 footer, and a
+  standalone LinkedIn post
+
+---
+
 ## How this file is updated
 
 1. Pre-flight decisions are written before any sub-phase code lands.
