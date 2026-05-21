@@ -3,7 +3,7 @@
 A multi-tenant case-management SaaS built end-to-end in the open — backend, frontend, infrastructure, deployment — as a working demonstration of an **AI-driven SDLC** at production scale.
 
 **Live demo:** [caseflow.musto.io](https://caseflow.musto.io) (register-and-approve flow — see below)
-**Methodology series:** [AI-Ready SDLC — the kickoff](https://www.linkedin.com/in/armando-musto/) (Article 01)
+**Methodology series:** [AI-Ready SDLC — the kickoff](https://www.linkedin.com/in/armandomusto/) (Article 01)
 **Current phase:** P1 complete (9/9) · [`ROADMAP.md`](./ROADMAP.md)
 
 ---
@@ -48,7 +48,7 @@ If you want to drive the actual software, the [live demo](https://caseflow.musto
 The deployed environment uses a **register-and-approve** model rather than shared credentials. To drive it:
 
 1. Visit [caseflow.musto.io](https://caseflow.musto.io) and click **Create one** to register with your real email + name
-2. DM me on [LinkedIn](https://www.linkedin.com/in/armando-musto/) with the email you used — I'll approve your account within a few hours
+2. DM me on [LinkedIn](https://www.linkedin.com/in/armandomusto/) with the email you used — I'll approve your account within a few hours
 3. Log in. You'll see the engineer dashboard with realistic seeded data (35 cases distributed across 3 tenants, priority + status + age varied deliberately for the demo)
 
 Why this rather than published credentials? Because I want to know who's interested. Also — the approval flow itself IS one of the more architecturally interesting patterns in the project, and walking a real visitor through it is a better demonstration than any blog post.
@@ -120,7 +120,7 @@ This project anchors a writing series unpacking the patterns in detail:
 - **Article 02** — Decision logs as engineering artifacts (next)
 - **Article 12** — Oracle, Tutor, Collaborator: choosing your AI's mode (the philosophical center)
 
-Follow along on [LinkedIn](https://www.linkedin.com/in/armando-musto/).
+Follow along on [LinkedIn](https://www.linkedin.com/in/armandomusto/).
 
 ## Stack
 
@@ -138,8 +138,8 @@ This showcase repo (the methodology artifacts, prose, and the AI-Ready SDLC grap
 
 ## Want to talk
 
-If you're a recruiter, hiring manager, or engineering leader thinking about AI-native delivery patterns, the fastest way to reach me is a [LinkedIn DM](https://www.linkedin.com/in/armando-musto/).
+If you're a recruiter, hiring manager, or engineering leader thinking about AI-native delivery patterns, the fastest way to reach me is a [LinkedIn DM](https://www.linkedin.com/in/armandomusto/).
 
 ---
 
-Built by [Armando Musto](https://www.linkedin.com/in/armando-musto/), Technical Lead — currently shipping engineering teams through the AI-native transition.
+Built by [Armando Musto](https://www.linkedin.com/in/armandomusto/), Technical Lead — currently shipping engineering teams through the AI-native transition.
