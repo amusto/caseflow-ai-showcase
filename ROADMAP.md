@@ -23,10 +23,26 @@ elapsed time depends on focus and velocity.
 
 ## Current state
 
-**Today:** 2026-05-21 — **Phase 1 closed at 9/9. v0.1.0 tagged. Public showcase repo live.** P1's feature branch merged to main on 2026-05-20; v0.1.0 carries the demo-ready deployed environment (caseflow.musto.io). The public methodology surface stood up alongside the tag at [github.com/amusto/caseflow-ai-showcase](https://github.com/amusto/caseflow-ai-showcase) — README, ROADMAP, decision log, dev-ready specs, AI-Ready SDLC graphic, Article 01, screenshots, LICENSE (CC BY 4.0). The split between the private implementation repo and the public showcase is itself captured as Pre-flight 27 in the Phase 1 decision log. Article 01 (*AI-Ready SDLC — the kickoff*) shipped on LinkedIn 2026-05-20; the publishing pipeline carries Articles 02-13 on a roughly weekly cadence from Tuesday 2026-05-26 forward. Decision log carries 27 pre-flights + 11 mid-flights.
-**Active scope:** 9 / 76 core sub-phases shipped (12%). P1 (Multi-tenancy + Real Auth) is ✅ at 9/9. P2 (Admin section + Customer model) is ⬜ — P2.1 dev-ready spec drafted (`sdlc-roadmap-requirements/docs/tasks/dev-ready/p2-1-admin-section-foundation.md`); Pre-flights 1-4 captured in the new `docs/decisions/phase-02-admin-and-personalization.md` log. P10 (Cloud infrastructure — dev) is 🚧 — dev environment is live (ECS + RDS + ALB + CloudFront + S3) but a few sub-phases (ai_worker, events, formal e2e, cost guardrails) remain; recommended to weave in just before P7. **Recommended order: P2.1 implementation → P2.2 spec + implementation → P2.3+ (customer model)**, with the rest of P2 building on top.
-**Last shipped:** **Phase 1 close-out (2026-05-20 → 2026-05-21).** Sequenced: P1.7 (tour engine) → P1.8 (Engineer Dashboard MVP) → P1.9 (demo seed harness) → feature-branch merge to main → screenshots in root README → v0.1.0 tag → showcase repo published. The Engineer Dashboard's widget-registry composition primitive (P1.8's `{ id, title, audience, Component }` contract) carries forward as a reusable composition pattern; P2.1 reuses it for the admin section, validating the registry-as-architectural-payoff claim. The deterministic demo seed harness (P1.9) produces 3 tenants × 30 users × 105 cases via manual UUID v5 hashing — the same hashing names rows AND identifies them for wipe-and-reinsert, making the seed its own idempotency mechanism. Defense-in-depth production guards (CLI confirmation, `NODE_ENV=production` refusal, dev-account-only RDS) keep the seeder safe across all targets. Pre-flight 27 (Showcase repo pattern over fully-public main repo) ties the close-out together: implementation stays private; methodology surface (ROADMAP, decisions, specs, articles, screenshots) goes public via the showcase repo. The 5-minute "sync methodology artifacts" ritual at each phase close-out keeps the showcase fresh without polishing-for-public on every implementation commit.
+**Today:** 2026-05-23 — **P2.2 shipped. P2 open at 2/7. NotificationsModule lands with three transactional email types (admin alert + customer welcome + approval-granted), Resend transport, tenant-aware admin recipient lookup, and the `void promise.catch(() => undefined)` fire-and-forget pattern that's now the project standard for Node 24's strict unhandled-rejection policy. ROADMAP also expanded with AI/RAG sub-phases (P7.7, P8.6, P9.7, P9.8) + a new core Phase 13 (Email-in case creation). Stretch phases renumbered from P13–P15 to P14–P16.** P2.1 (Admin section foundation) closes today: the `/admin` route is live behind `RequireRole(ADMIN)`, the widget-registry composition primitive from P1.8 was re-used (parallel `adminWidgets` registry, same `Widget` contract), and the first widget — `PendingApprovalUsers` — handles one-click approve / reject against `PATCH /users/:id/status` with optimistic update + rollback. Backend gained `GET /users?status=` admin-gated; frontend gained a `usersSlice` with `createSelector`-memoized `selectPendingApprovalUsers`. Two mid-flights captured along the way: TextEncoder polyfill in `jest.setup.ts` (react-router 6.4+ uses it at module load; jsdom doesn't expose it) and a backend ESLint flat-config repair (missing `globals.node` / `globals.jest`, base `no-undef`/`no-unused-vars` not disabled in favor of TS-aware variants, `varsIgnorePattern: '^_'` for intentional destructured discards). v0.1.0 tag from 2026-05-21 still carries the demo-ready deployed environment at [caseflow.musto.io](https://caseflow.musto.io); the public methodology surface is at [github.com/amusto/caseflow-ai-showcase](https://github.com/amusto/caseflow-ai-showcase). Article 01 (*AI-Ready SDLC — the kickoff*) shipped on LinkedIn 2026-05-20. Decision log carries 27 P1 pre-flights + 11 P1 mid-flights, plus 8 P2 pre-flights + 4 P2 mid-flights. Mid-flight 4 (`void promise.catch(() => undefined)` fire-and-forget pattern) is the project's new standard for any async side-effect dispatched without `await` — applies across notifications, future audit-log writes, and webhook dispatches. P7.7 will spawn its own decision log (pgvector vs. dedicated vector DB, embedding model choice, chunking strategy) when the spec opens.
+**Active scope:** 11 / 86 core sub-phases shipped (13%). P1 (Multi-tenancy + Real Auth) is ✅ at 9/9. P2 (Admin section + Customer model) is 🚧 at 2/7 — P2.1 + P2.2 ✅; next: P2.3 (`CustomerOrganization` + `CustomerContact` entities — opens the customer-model theme of P2). P10 (Cloud infrastructure — dev) is 🚧 — dev environment is live (ECS + RDS + ALB + CloudFront + S3) but a few sub-phases (ai_worker, events, formal e2e, cost guardrails) remain; recommended to weave in just before P7. **AI/RAG scope expanded 2026-05-23** — new sub-phases P7.7 (vector store + embedding pipeline on pgvector), P8.6 (historical case solution search), P9.7 + P9.8 (chat session infrastructure + engineer case assistant panel), and a new core Phase 13 (Email-in case creation with AI-assisted triage). Stretch phases renumbered: Billing P13→P14, Customer client P14→P15, Plugin model P15→P16. Combined scope went from 76+8=84 to 86+8=94 sub-phases. **Recommended order: P2.3 spec + implementation → P2.4+ (customer CRUD)**, with the rest of P2 building on top. **Cross-cutting work in flight:** [`docs/planning/contributor-framework.md`](docs/planning/contributor-framework.md) (husky + commitlint + verify.yml strict spec-gate + deploy.yml via OIDC + branch protection — all decisions resolved, implementation deferred) and [`docs/planning/soc2-readiness.md`](docs/planning/soc2-readiness.md) (Framing A: SOC II-aware SDLC; scope CC/A/C/PI; mapping table + spec-template + verify.yml compliance-check job + three supporting docs identified, implementation deferred). See "Cross-cutting planning" below.
+**Last shipped:** **P2.2 — Admin notification + customer lifecycle emails (2026-05-23).** New backend `NotificationsModule` with Resend as the outbound transport (Pre-flight 5; SES deferred to P12) and a `LogTransport` dev fallback selected by the transport factory when `RESEND_API_KEY` is unset. Three transactional email types ship together (Pre-flight 6 reversed the original admin-only lean): **admin registration alert** fans out to every ACTIVE admin in the new registrant's tenant via dynamic `UsersService.listAdminsByTenant` lookup (Pre-flight 8 — no env-var routing); **customer welcome** on register; **customer approval-granted** on the `PATCH /users/:id/status` PENDING_APPROVAL → ACTIVE transition only. `AuthService.register()` + `googleSignIn()` JIT-create branch fire the admin alert + customer welcome pair; `UsersController.updateStatus` captures previous status and fires approval-granted only on that one positive transition (four negative-transition tests assert no-call). Templates render `{subject, html, text}` with HTML-escape enforced via shared layout helpers — XSS-safe under hostile names. The `UsersModule ↔ NotificationsModule` circular dep is resolved via paired `forwardRef`. **Mid-flight 4 captured during build**: fire-and-forget call sites use `void promise.catch(() => undefined)` rather than bare `void promise` — Node 24's strict unhandled-rejection policy crashes worker processes when a rejected promise has no handler, and the two-layer defense (`void` for the lint rule + `.catch()` for the runtime handler) is now the project standard for any async side-effect dispatched without `await`. Pre-flights 5–8 + Mid-flight 4 landed in the phase-02 decision log. **Previously shipped:** P2.1 — Admin section foundation (2026-05-22): `/admin` route gated by `<RequireRole>`, parallel `adminWidgets` registry, `PendingApprovalUsers` widget with one-click approve + reject (optimistic update + rollback), `GET /users?status=` admin-gated backend endpoint, `usersSlice` with `createSelector` memoization, two mid-flights (TextEncoder polyfill + backend ESLint repair). Contributor framework + SOC II readiness planning docs (2026-05-22 earlier) — design-only, ~12 future dev-ready specs to spawn. Phase 1 close-out (2026-05-20 → 2026-05-21) — tour engine → Engineer Dashboard MVP → demo seed harness → main merge → screenshots → v0.1.0 tag → showcase repo published. Pre-flight 27 (Showcase repo pattern) ties the close-out together.
 **Cost reminder:** Dev environment is live on AWS — ECS Fargate (1 task, 0.25 vCPU / 512 MB), RDS db.t4g.micro Postgres, ALB, CloudFront, S3 SPA bucket. ~$30-50/month at idle. Tear down with `terragrunt destroy` in each `infra/live/dev/*` stack if not actively demoing.
+
+---
+
+## Cross-cutting planning
+
+Some work doesn't belong to a single phase — it's foundational tooling or process that touches every phase. These planning docs live under [`docs/planning/`](docs/planning/) and capture the design before any implementation. When promoted, each spawns dev-ready specs that slot into a future phase.
+
+| Doc | Status | What it covers | Decisions resolved | Pending implementation spawns |
+|---|---|---|---|---|
+| [`contributor-framework.md`](docs/planning/contributor-framework.md) | 📐 Design complete | Onboarding (`CONTRIBUTING.md` + `docs/onboarding/`), branch naming convention, husky + commitlint hooks, `verify.yml` strict spec-linkage gate, `deploy.yml` via GitHub OIDC, PR template, branch protection | 7/7 (D1–D7) | ~5 dev-ready specs |
+| [`soc2-readiness.md`](docs/planning/soc2-readiness.md) | 📐 Design complete | Framing A (SOC II-aware SDLC) with B documented as future path. Scope CC + A + C + PI; Privacy excluded. Mapping table from SDLC artifacts to TSCs. Spec-template Compliance impact section. Decision-log TSC tag. `verify.yml` compliance-check job. Three supporting docs identified: `audit-logging.md`, `secret-rotation.md`, `access-review.md`. | 5/5 (D1–D5) + 8 open | ~7 dev-ready specs |
+| [`jira-integration.md`](docs/planning/jira-integration.md) | 📌 Placeholder | Reserved slot. Five possible framings surfaced (internal SDLC tracking, customer-facing workflow, AI context source, plugin reference template, bidirectional sync). Activation triggers + open questions captured. No design committed. | 0/0 (framing TBD) | TBD on activation |
+
+**When these promote into phase work:** Both docs include §11 promotion paths. The contributor framework is a near-term candidate (sequenced as a tooling sub-phase at the front of P2 or as a dedicated P2.0). The SOC II hooks layer on top of the contributor framework and are best slotted as a compliance-overlay sub-phase between P2 and P3, OR distributed across P2/P3/P4 as each touches more SOC II-relevant surface (auth in P2.1-2.2, audit-log table in P3, attachments/encryption in P4).
+
+**Why this lives at the roadmap level:** These aren't features — they're how every feature gets built. Burying them in a phase would obscure that they affect all phases. Treating them as cross-cutting also matches how SOC II auditors think — they look for systemic controls, not phase-by-phase compliance.
 
 ---
 
@@ -35,9 +51,9 @@ elapsed time depends on focus and velocity.
 ### Overall
 
 ```
-Core (P1-P12):      [██░░░░░░░░░░░░░░░░░░]  12%  ( 9 / 76 sub-phases)
-Stretch (P13-P15):  [░░░░░░░░░░░░░░░░░░░░]   0%  ( 0 /  8 sub-phases)
-Combined:           [██░░░░░░░░░░░░░░░░░░]  11%  ( 9 / 84 sub-phases)
+Core (P1-P13):      [██░░░░░░░░░░░░░░░░░░]  13%  (11 / 86 sub-phases)
+Stretch (P14-P16):  [░░░░░░░░░░░░░░░░░░░░]   0%  ( 0 /  8 sub-phases)
+Combined:           [██░░░░░░░░░░░░░░░░░░]  12%  (11 / 94 sub-phases)
 ```
 
 > **Core** is the MVP — what reviewers expect to see to call the project
@@ -53,20 +69,21 @@ Combined:           [██░░░░░░░░░░░░░░░░░�
 | # | Phase | Bar | % | Sub-phases | Status |
 |---|---|---|---|---|---|
 | 1 | Multi-tenancy + Real Auth foundation       | `██████████` | 100% | 9/9 | ✅ |
-| 2 | Admin section + Customer model             | `░░░░░░░░░░` | 0% | 0/7 | ⬜ |
+| 2 | Admin section + Customer model             | `██░░░░░░░░` | 29% | 2/7 | 🚧 |
 | 3 | Activity, collaboration, audit             | `░░░░░░░░░░` | 0% | 0/6 | ⬜ |
 | 4 | Attachments & documents                    | `░░░░░░░░░░` | 0% | 0/5 | ⬜ |
 | 5 | Workflow engine: status, SLA, escalation   | `░░░░░░░░░░` | 0% | 0/6 | ⬜ |
 | 6 | Team operations                            | `░░░░░░░░░░` | 0% | 0/5 | ⬜ |
-| 7 | AI foundation                              | `░░░░░░░░░░` | 0% | 0/6 | ⬜ |
-| 8 | AI capabilities — batch 1                  | `░░░░░░░░░░` | 0% | 0/5 | ⬜ |
-| 9 | AI capabilities — batch 2                  | `░░░░░░░░░░` | 0% | 0/6 | ⬜ |
+| 7 | AI foundation (incl. vector store)         | `░░░░░░░░░░` | 0% | 0/7 | ⬜ |
+| 8 | AI capabilities — batch 1 + search         | `░░░░░░░░░░` | 0% | 0/6 | ⬜ |
+| 9 | AI capabilities — batch 2 + chatbot        | `░░░░░░░░░░` | 0% | 0/8 | ⬜ |
 | 10 | Cloud infrastructure — dev                | `░░░░░░░░░░` | 0% | 0/9 | ⬜ |
 | 11 | Observability + operational reporting     | `░░░░░░░░░░` | 0% | 0/6 | ⬜ |
 | 12 | Production environment + release readiness| `░░░░░░░░░░` | 0% | 0/6 | ⬜ |
-| 13 | Subscription & billing readiness (stretch)| `░░░░░░░░░░` | 0% | 0/3 | 🎯 |
-| 14 | Customer-facing client app (stretch)      | `░░░░░░░░░░` | 0% | 0/3 | 🎯 |
-| 15 | Plugin/module model + templates (stretch) | `░░░░░░░░░░` | 0% | 0/2 | 🎯 |
+| 13 | Email-in case creation                    | `░░░░░░░░░░` | 0% | 0/6 | ⬜ |
+| 14 | Subscription & billing readiness (stretch)| `░░░░░░░░░░` | 0% | 0/3 | 🎯 |
+| 15 | Customer-facing client app (stretch)      | `░░░░░░░░░░` | 0% | 0/3 | 🎯 |
+| 16 | Plugin/module model + templates (stretch) | `░░░░░░░░░░` | 0% | 0/2 | 🎯 |
 
 ### Gantt — phases on a timeline
 
@@ -94,10 +111,12 @@ gantt
     P10 Cloud infra — dev            :         p10, after p9, 4d
     P11 Observability + reporting    :         p11, after p10, 2d
     P12 Production + release         :         p12, after p11, 3d
+    section Email
+    P13 Email-in case creation       :         p13, after p12, 3d
     section Stretch
-    P13 Billing                      :         p13, after p12, 2d
-    P14 Customer client app          :         p14, after p13, 3d
-    P15 Plugin model                 :         p15, after p14, 3d
+    P14 Billing                      :         p14, after p13, 2d
+    P15 Customer client app          :         p15, after p14, 3d
+    P16 Plugin model                 :         p16, after p15, 3d
 ```
 
 ### Phase × Requirements matrix
@@ -120,9 +139,10 @@ view: progress isn't just "code shipped" — it's "contract clauses honored."
 | P10 | ⬜ | #7 (validation commands include `terraform fmt`/`validate`, `terragrunt hclfmt`), #8 (every AWS resource type justified) | #3 (zero secrets in TF), #6 (no rogue third app surface), #7 (architecture changes happen via phase spec) | First real cloud deploy; account-guard precondition prevents wrong-account applies |
 | P11 | ⬜ | #6 (chaos-drill tests for alarm paths), #7 | — | Dashboards + alarms + operational reporting |
 | P12 | ⬜ | #7, #11 (Conventional Commits drive release-please) | #3 (prod secrets in Secrets Manager, never in TF) | Prod environment + release automation |
-| P13 🎯 | ⬜ | #4 (Stripe webhooks validated; idempotency keyed on event id) | #3, #5 | Optional stretch — pulls in only if SaaS billing is needed |
-| P14 🎯 | ⬜ | #1, #6 | #6 (separate workspace introduced **with** confirmation) | Customer-facing client; deliberate "Do Not #6" exception |
-| P15 🎯 | ⬜ | #1, #7 | #7 (plugin model is the architecture change, not a refactor) | Plugin/module + industry templates |
+| P13 | ⬜ | #4 (DTO validation on inbound webhook payload), #5 (no auto-applied AI; engineer approval gates draft→OPEN), #6 (tests for cross-tenant routing safety) | #1 (validation around AI-generated triage), #3 (Resend webhook secret via Secrets Manager), #5 (auditable triage trail) | Inbound email → draft case w/ AI-assisted triage |
+| P14 🎯 | ⬜ | #4 (Stripe webhooks validated; idempotency keyed on event id) | #3, #5 | Optional stretch — pulls in only if SaaS billing is needed |
+| P15 🎯 | ⬜ | #1, #6 | #6 (separate workspace introduced **with** confirmation) | Customer-facing client; deliberate "Do Not #6" exception |
+| P16 🎯 | ⬜ | #1, #7 | #7 (plugin model is the architecture change, not a refactor) | Plugin/module + industry templates |
 
 **Legend.** Operating principles and "Do Not" rules are numbered per the
 root [`CLAUDE.md`](CLAUDE.md). The matrix is additive — once a clause is
@@ -143,20 +163,21 @@ satisfied by an earlier phase, later phases inherit and must not violate it.
 | # | Phase | Status | Primary deliverable | Decision log |
 |---|---|---|---|---|
 | 1  | Multi-tenancy + Real Auth foundation | ✅ (9/9) | ✅ Tenant entity · ✅ real auth (bcrypt + JWT + refresh tokens + admin approval + default tenant) · ✅ Google OAuth + JIT · ✅ JwtAuthGuard + ActiveUserGuard (global) · ✅ tenant-scoped queries · ✅ frontend login + session bootstrap · ✅ tour engine · ✅ Engineer Dashboard MVP · ✅ demo seed harness | [`docs/decisions/phase-01-multi-tenancy-auth.md`](docs/decisions/phase-01-multi-tenancy-auth.md) |
-| 2  | Admin section + Customer model | ⬜ | `/admin` route + widget-registry reuse · `PendingApprovalUsers` widget · admin notification on registration (Resend) · `CustomerOrganization` + `CustomerContact` entities · cases FK to customer org · customer CRUD endpoints · frontend customer list/detail | [`docs/decisions/phase-02-admin-and-personalization.md`](docs/decisions/phase-02-admin-and-personalization.md) |
+| 2  | Admin section + Customer model | 🚧 (2/7) | ✅ `/admin` route + widget-registry reuse · ✅ `PendingApprovalUsers` widget · ✅ `NotificationsModule` (Resend) + admin alert + customer welcome + approval-granted · `CustomerOrganization` + `CustomerContact` entities · cases FK to customer org · customer CRUD endpoints · frontend customer list/detail | [`docs/decisions/phase-02-admin-and-personalization.md`](docs/decisions/phase-02-admin-and-personalization.md) |
 | 3  | Activity, collaboration, audit | ⬜ | Notes (internal vs customer-visible) · extended timeline · compliance-grade AuditLog table · frontend timeline + note composer | _pending_ |
 | 4  | Attachments & documents | ⬜ | Attachment entity · presigned-URL flow · local-dev MinIO/filesystem (real S3 deferred to P10) · upload UI | _pending_ |
 | 5  | Workflow engine: status, SLA, escalation | ⬜ | Status state machine · SLA clock + breach detection · data-driven escalation rules · frontend SLA badge | _pending_ |
 | 6  | Team operations | ⬜ | Queue entity · routing strategies (round-robin / skill / workload) · workload dashboard | _pending_ |
-| 7  | AI foundation | ⬜ | AiProvider interface · Bedrock + OpenAI adapters · versioned Prompt entity · AiInvocation audit log · SQS queue + worker pattern (local) | _pending_ |
-| 8  | AI capabilities — batch 1 | ⬜ | Case summarization · suggested resolutions · human-approval gate · AI insight panel on case detail | _pending_ |
-| 9  | AI capabilities — batch 2 | ⬜ | Next actions · escalation risk · sentiment · priority scoring · duplicate detection (all approval-gated) | _pending_ |
+| 7  | AI foundation (incl. vector store) | ⬜ | AiProvider interface · Bedrock + OpenAI adapters · versioned Prompt entity · AiInvocation audit log · SQS queue + worker pattern (local) · **pgvector + RetrievalService (RAG foundation)** | _pending_ |
+| 8  | AI capabilities — batch 1 + search | ⬜ | Case summarization · suggested resolutions · human-approval gate · AI insight panel on case detail · **historical case solution search** | _pending_ |
+| 9  | AI capabilities — batch 2 + chatbot | ⬜ | Next actions · escalation risk · sentiment · priority scoring · duplicate detection (all approval-gated) · **chat session infra + engineer case assistant panel** | _pending_ |
 | 10 | Cloud infrastructure — dev | ⬜ | Terraform/Terragrunt: buckets · rds_postgres · backend_ecr · backend_ecs · frontend_cdn · ai_worker · events · observability · end-to-end smoke test | _pending_ |
 | 11 | Observability + operational reporting | ⬜ | CloudWatch dashboard · error/SLA/AI-queue alarms · operational reporting endpoints + frontend views | _pending_ |
 | 12 | Production environment + release readiness | ⬜ | `live/prod/` stacks · multi-AZ RDS · WAF · release-please · CI/CD deploys · runbooks | _pending_ |
-| 13 | Subscription & billing readiness (stretch) | 🎯 | Stripe wiring · plan limits · usage metering | _pending_ |
-| 14 | Customer-facing client app (stretch) | 🎯 | New `client/` workspace · magic-link auth · file-a-case + view-my-cases | _pending_ |
-| 15 | Plugin/module model + industry templates (stretch) | 🎯 | Plugin interface · two reference templates (e.g., gov-contractor support, SaaS-team escalations) | _pending_ |
+| 13 | Email-in case creation | ⬜ | Resend Inbound webhook · MIME parsing + attachment streaming · sender matching · AI-assisted triage (similar cases, summary, priority) · draft case workflow with engineer review | _pending_ |
+| 14 | Subscription & billing readiness (stretch) | 🎯 | Stripe wiring · plan limits · usage metering | _pending_ |
+| 15 | Customer-facing client app (stretch) | 🎯 | New `client/` workspace · magic-link auth · file-a-case + view-my-cases | _pending_ |
+| 16 | Plugin/module model + industry templates (stretch) | 🎯 | Plugin interface · two reference templates (e.g., gov-contractor support, SaaS-team escalations) | _pending_ |
 
 ---
 
@@ -185,7 +206,7 @@ a different tenant. Frontend gets a real login.
 - [x] Frontend can log in via both methods and lands on the case list scoped to the user's tenant.
 - [x] Unit tests cover: login success/failure, JWT expiry rejection, cross-tenant read attempt, RBAC denial for `CUSTOMER` trying to access engineer endpoints.
 - [x] **P1.7** — Tour engine renders for `ENGINEER` + `ADMIN`; never renders for `CUSTOMER` (asserted in tests + verified in deployed env). First onboarding tour walks the post-login surface end-to-end. `UserTourState` records completion + version per user, syncs across devices.
-- [x] **P1.8** — `/` route renders the Engineer Dashboard with `myOpenCases`, `recentActivity`, and `quickActions` widgets for `ENGINEER` + `ADMIN` (verified locally). Empty states designed for every widget. `CUSTOMER` users continue to land on the existing `<Home />` placeholder (formalized in P14). Onboarding tour re-anchored to dashboard widgets at version 2.
+- [x] **P1.8** — `/` route renders the Engineer Dashboard with `myOpenCases`, `recentActivity`, and `quickActions` widgets for `ENGINEER` + `ADMIN` (verified locally). Empty states designed for every widget. `CUSTOMER` users continue to land on the existing `<Home />` placeholder (formalized in P15 — Customer-facing client app, stretch). Onboarding tour re-anchored to dashboard widgets at version 2.
 - [x] **P1.9** — `dev.sh demo:seed` populates a deterministic 3-tenant dataset locally; `dev.sh demo:seed --target=rds` (with confirmation prompt) populates the deployed dev environment. `dev.sh demo:reset` re-runs cleanly. Seed refuses to run with `NODE_ENV=production`. Verified locally with realistic-name display in the dashboard welcome heading.
 
 **Resolved pre-flight decisions** (full text in [`docs/decisions/phase-01-multi-tenancy-auth.md`](docs/decisions/phase-01-multi-tenancy-auth.md)):
@@ -261,8 +282,8 @@ The two themes are sequenced — Admin section lands first so subsequent custome
 **Sub-phases & deliverables:**
 
 *Admin theme (P2.1 + P2.2):*
-- ⬜ **P2.1** **Admin section foundation** — new `/admin` route (`AdminRouter` parallel to `DashboardRouter`, gated to `role === 'ADMIN'`). Widget-registry composition reused from P1.8 with a new `adminWidgets` array. First widget: `PendingApprovalUsers` — list of users in `PENDING_APPROVAL` status with one-click approve/reject buttons hitting `PATCH /users/:id/status`. ADMIN role chip in nav links to `/admin` when logged-in user has the role. Foundation for all subsequent admin functionality.
-- ⬜ **P2.2** **Admin notification on user registration** — `NotificationsModule` in backend with a transport adapter (Resend is the recommended choice; SES deferred to P12). `NotificationsService.sendNewRegistration({user, tenant})` fires non-blocking from `AuthService.register()`. Email body links to the new `/admin` pending-approval surface so the admin can act in one click. `ADMIN_NOTIFY_EMAIL` env var + Resend API key in Secrets Manager. Customer-facing emails (welcome, approval) deferred — evaluated after this iteration based on actual demand from the LinkedIn audience trying the register-and-approve demo flow.
+- ✅ **P2.1** **Admin section foundation** (shipped 2026-05-22). New `/admin` route gated by `<RequireRole role="ADMIN" />` (a fresh outlet wrapper alongside `<RequireAuth />` and `<RequireActiveAuth />`). Widget-registry composition reused from P1.8 — `adminWidgets: ReadonlyArray<Widget>` parallel to `allWidgets`, sharing the `Widget` contract via re-export from `@/features/dashboard/types`. First widget `PendingApprovalUsers` lists `PENDING_APPROVAL` users in the admin's tenant with one-click Approve + Reject (Reject opens a confirmation dialog); both dispatch `updateUserStatusThunk` which optimistically removes the row from `selectPendingApprovalUsers` and rolls back on failure with a snackbar. Backend gained `GET /users?status=` admin-gated (`actor.role === 'ADMIN'`, returns `SafeUser[]`), `ListUsersQueryDto` (class-validator `@IsEnum(UserStatus)`), and `listByTenant(tenantId, { status? })` on `UsersService`. Frontend gained `usersApi`, `usersSlice` (`fetchUsersThunk` with RTK `condition` dedup + `updateUserStatusThunk` with `pendingStatusChanges` rollback map), and `createSelector`-memoized `selectPendingApprovalUsers`. Admin nav button in `Layout.tsx` appears only when `user.role === 'ADMIN'`. Two mid-flights captured during the build: TextEncoder polyfill (`jest.setup.ts`) for react-router 6.4+ under jsdom; backend ESLint flat-config repair (added `globals.node` / `globals.jest`, disabled base `no-undef`/`no-unused-vars` in favor of TS-aware variants, `varsIgnorePattern: '^_'`).
+- ✅ **P2.2** **Admin notification on user registration + customer lifecycle emails** (shipped 2026-05-23). `NotificationsModule` in backend with Resend transport (Pre-flight 5: SES deferred to P12) and a `LogTransport` dev fallback selected by the transport factory when `RESEND_API_KEY` is unset. Three transactional email types shipped together (Pre-flight 6 — reversing the original "admin-only, defer customer emails" lean): admin registration alert fans out to every ACTIVE admin in the new user's tenant via dynamic lookup (Pre-flight 8 — `UsersService.listAdminsByTenant`, no env-var routing); customer welcome on register; customer approval-granted on `PATCH /users/:id/status` PENDING_APPROVAL → ACTIVE transition only. `AuthService.register()` and the `googleSignIn()` JIT-create branch fire the admin alert + customer welcome pair; `UsersController.updateStatus` captures previous status and fires approval-granted only on the one positive transition (four negative-transition tests assert no-call). Templates are pure functions returning `{subject, html, text}` — table-based HTML with HTML-escaping enforced via a shared layout helper (XSS-safe even when registrants submit hostile names). The `UsersModule ↔ NotificationsModule` circular dependency is resolved via paired `forwardRef` on both modules + constructor-level `@Inject(forwardRef(...))` in `UsersController` and `NotificationsService`. **Mid-flight 4 captured during build**: fire-and-forget call sites use `void promise.catch(() => undefined)` rather than bare `void promise` — Node 24's strict unhandled-rejection policy crashes worker processes when a rejected promise has no handler, and the two-layer defense (`void` for the lint rule + `.catch()` for the runtime handler) survives any future contract violation inside `NotificationsService`. Spec at [`p2-2-admin-notification.md`](sdlc-roadmap-requirements/docs/tasks/dev-ready/p2-2-admin-notification.md); decision log carries Pre-flights 5–8 + Mid-flight 4.
 
 *Customer model theme (P2.3 → P2.7):*
 - ⬜ **P2.3** `CustomerOrganization` entity (tenant-scoped, name, primary contact, status) + `CustomerContact` entity (tenant + customer-org scoped, email, name, phone).
@@ -399,18 +420,23 @@ surface from a "call OpenAI in a controller" prototype.
 - ⬜ **P7.4** `AiInvocation` audit log — every call records provider, prompt version, input hash, output, cost (tokens × pricing), latency, success/failure, the human-approval state.
 - ⬜ **P7.5** SQS-backed processing — backend enqueues an AI job, an out-of-process worker dequeues + invokes the provider. Local dev runs the worker as a separate yarn script; SQS itself is mocked locally via [LocalStack](https://localstack.cloud/) or an in-memory bus, with the real SQS landing in P10.
 - ⬜ **P7.6** Tests: provider fallback (primary throws → secondary invoked), prompt-version pinning, audit-log completeness, queue idempotency.
+- ⬜ **P7.7** **Vector store + embedding pipeline** — the RAG foundation every downstream feature plugs into (P8.2 suggested resolutions, P8.6 historical case search, P9.5 duplicate detection, P9.7+P9.8 case assistant chatbot, P13 email-in triage). Adds the `pgvector` extension to the existing RDS Postgres (P10.3 already operational), introduces a `case_chunks` table carrying `tenantId`, `customerId`, `caseId`, `sourceType` (CASE, NOTE, RESOLUTION, ATTACHMENT_TEXT), `sourceId`, `visibility`, `lifecycleStatus`, `content`, and `embedding vector(N)`. Provider-agnostic via an `EmbeddingProvider` interface (Bedrock Titan adapter primary, OpenAI text-embedding-3-small alt — mirrors the P7.1 inference-provider pattern). Embed-on-write hooks dispatch jobs through the P7.5 SQS queue when cases or notes change. **Security-first retrieval** — `RetrievalService.searchSimilarCases(query, tenantId, filters)` enforces tenant + RBAC + visibility + lifecycle filters in the SQL `WHERE` clause *before* vector similarity sort. Prompts never see rows from another tenant. Tests cover cross-tenant isolation (empty results), visibility (CUSTOMER role sees only CUSTOMER_VISIBLE chunks), embed-on-write idempotency, and retrieval ranking.
 
 **Acceptance criteria:**
 - [ ] Calling `aiService.summarize(case)` enqueues a job, the worker runs it, and the result lands back via an outbox/event with a matching audit row.
 - [ ] An `AiInvocation` row exists for every provider call, success or failure.
 - [ ] Swapping providers requires zero changes outside the adapter file.
+- [ ] **P7.7** — `case_chunks` table is populated within one queue cycle of a case create / update / note add. `searchSimilarCases` returns tenant-scoped, role-filtered, visibility-aware results and never leaks rows across tenants under any combination of filters. Switching the embedding provider requires zero changes outside the adapter.
 
 **Open decisions to resolve at start:**
 1. Provider fallback — automatic on error, or explicit per-prompt?
-2. Cost tracking — record per invocation only, or also aggregate per tenant for billing-readiness (anticipates P13)?
+2. Cost tracking — record per invocation only, or also aggregate per tenant for billing-readiness (anticipates P14)?
 3. Local-dev queue — LocalStack, in-memory, or both?
+4. **P7.7 embedding model** — Bedrock Titan (in-AWS, IAM-native, matches the Pre-flight 22 lean toward Bedrock) vs OpenAI `text-embedding-3-small` (cheaper, often better on technical content). Recommendation: Bedrock Titan.
+5. **P7.7 chunking strategy** — whole-case vs per-note vs fixed-token-window. Recommendation: per-note chunks (the natural visibility + author boundary).
+6. **P7.7 hybrid search** — pure vector for MVP; layer BM25 keyword search if retrieval quality is unsatisfactory after dogfooding.
 
-**Dependencies:** P1 (tenant), P3 (audit log table can be extended or AI uses its own).
+**Dependencies:** P1 (tenant), P3 (notes table — the primary corpus for P7.7 chunks), P10.3 (RDS Postgres — already operational; P7.7 needs `pgvector` enabled on it).
 
 ---
 
@@ -426,13 +452,15 @@ without an engineer's approval.
 - ⬜ **P8.3** Human approval flow — `AiArtifact` state machine: `pending → approved | rejected | edited`. Approved/edited artifacts can flow to customer-visible surfaces; rejected ones stay internal-only and feed a "what the AI got wrong" log.
 - ⬜ **P8.4** Tests: rejected artifacts never appear on customer-visible endpoints; approval flow audit-logged; edit preserves AI-original alongside the human-edited version.
 - ⬜ **P8.5** Frontend: AI insight panel on case detail (Summary + Suggested Resolutions sections), approval controls, edit-in-place.
+- ⬜ **P8.6** **Historical case solution search** — standalone natural-language search over historical cases, notes, resolution summaries, and (when P4 lands) attachment-extracted text. Different surface from P8.2 (per-case suggested resolutions, triggered from inside an open case) — this is a dedicated `/search` page where engineers investigate by topic, not by current-case context. `POST /search/cases` accepts a query plus optional filters (status, dateRange, customer, productArea, severity). `SearchService.searchCases(query, actor, filters)` uses P7.7's `RetrievalService` for the candidate set, re-ranks by recency + relevance, then passes the top-k chunks as context to an AI-cited-answer prompt. Model output is parsed for source-ID citations; the response surfaces inline `[1]`-style references that link back to the actual case records. **Low-confidence fallback** — if max similarity score is below threshold, the response is "no confident match found" rather than a fabricated answer. Frontend `/search` page renders the AI summary at top with citations, ranked results below, each result showing case title + snippet + "View case" link. Per-user search history (tenant-scoped) feeds a "recent searches" panel for return visits.
 
 **Acceptance criteria:**
 - [ ] A summarization request produces a reviewable artifact and writes one `AiInvocation` row.
 - [ ] A rejected suggested-resolution is invisible to customer-role users.
 - [ ] An approved + edited summary preserves both the AI version and the human-edited version.
+- [ ] **P8.6** — Cross-tenant search isolation verified (Tenant A's query cannot retrieve Tenant B's chunks under any filter combination). CUSTOMER role sees only CUSTOMER_VISIBLE chunks. Low-confidence queries return the "no confident match" envelope, not a fabricated answer. Cited source IDs in the AI summary must exist in the retrieved candidate set — citations referencing rows outside the candidate set are dropped before render.
 
-**Dependencies:** P7.
+**Dependencies:** P7 (including P7.7 retrieval service), P3 (notes corpus).
 
 ---
 
@@ -446,14 +474,18 @@ through the same approval gate established in P8.
 - ⬜ **P9.2** Escalation risk detection — classifier prompt produces `low | medium | high` plus reasoning; high-risk surfaces a banner.
 - ⬜ **P9.3** Sentiment analysis — per-note sentiment + rolling case-level sentiment.
 - ⬜ **P9.4** Priority scoring — prompt produces a suggested priority; manager can accept/override.
-- ⬜ **P9.5** Duplicate issue detection — embedding-based similarity over open cases in the same tenant; surfaces "possible duplicates" panel.
+- ⬜ **P9.5** Duplicate issue detection — embedding-based similarity over open cases in the same tenant; surfaces "possible duplicates" panel. Reuses the `RetrievalService` from P7.7 instead of building its own embedding pipeline.
 - ⬜ **P9.6** Tests + frontend wiring for each capability.
+- ⬜ **P9.7** **Chat session infrastructure** — the multi-turn conversational backend for the engineer case assistant chatbot. New `ChatSession` entity (tenant + user + caseId scoped) and `ChatMessage` entity (`sessionId`, `role` USER/ASSISTANT, `content`, `citations[]` array of source-chunk IDs, `aiInvocationId` FK to P7.4, `createdAt`). `ChatService.send(sessionId, message, actor)` assembles context from session history + retrieved chunks (via P7.7), manages the token budget by truncating oldest messages when the context window fills, calls the AI provider, persists the assistant response + citations. Endpoints: `POST /chat/sessions`, `POST /chat/sessions/:id/messages`, `GET /chat/sessions/:id` — all tenant + user-gated. Tests cover session isolation (one user cannot see another user's sessions even within the same tenant), context-window truncation correctness, citation persistence.
+- ⬜ **P9.8** **Engineer case assistant panel** — frontend chat UI docked to the case detail view, with action templates for the common asks. Collapsible drawer that opens on user click; action chip row exposes canned prompts: "Summarize this case", "What should I try next?", "Has this happened before?", "Should this be escalated?", "Draft a customer update", "Draft a stakeholder summary". Citations render inline as `[1]`-style references; hover shows source preview, click opens the source case in a new tab. The "Draft a stakeholder summary" action uses a structured template (Customer impact / Timeline / Root cause / Actions taken / Resolution / Follow-up items / Current status / Owner) tuned for resolved-priority cases. Customer-facing drafts ("Draft a customer update") route through the P8.3 `AiArtifact` gate — engineer review required before any draft can be sent to a customer. Engineer-facing summaries skip the gate. Panel never renders for CUSTOMER role (consistent with P1.7 tour-engine gating).
 
 **Acceptance criteria:**
 - [ ] All five capabilities pass through the P8 approval flow.
 - [ ] Duplicate detection respects tenant boundaries (no cross-tenant matches).
+- [ ] **P9.7** — Chat sessions persist across reload. A user's sessions are invisible to other users in the same tenant. Context-window truncation never drops the user's most recent message. Citations always reference real chunks present in the retrieved candidate set for that turn.
+- [ ] **P9.8** — Assistant panel renders only for ENGINEER and ADMIN roles. Customer-facing draft outputs land as `AiArtifact` rows in `pending` state (never sent without engineer approval). Stakeholder summaries for resolved-priority cases follow the structured template and never omit a required section.
 
-**Dependencies:** P7, P8.
+**Dependencies:** P7 (including P7.7 retrieval + P9.7 needs P7.4 AiInvocation log), P8 (artifact state machine, P9.8 customer-draft gating).
 
 ---
 
@@ -537,16 +569,49 @@ without a checklist sprint each time.
 
 ---
 
-## Phase 13 — Subscription & billing readiness 🎯 (stretch)
+## Phase 13 — Email-in case creation ⬜
+
+**Goal.** Let customers (and unrecognized senders) reach CaseFlow AI by email and have the system process the message into a *draft* case with AI-assisted triage — similar-case detection, summary, priority suggestion, sender-to-customer matching. Every AI output is a recommendation; an engineer reviews and promotes the draft to OPEN before the case enters the working queue. No customer-facing response is ever sent automatically.
+
+This phase ships after Production (P12) because inbound email needs the full operational stack — a stable HTTPS endpoint for webhook delivery, the observability + alarms from P11 to surface delivery failures, and prod-grade attachment storage from P10.2. It builds on the AI capabilities (P7-P9) but treats them as upstream services rather than its own concern.
+
+**Sub-phases & deliverables:**
+- ⬜ **P13.1** Inbound email transport — Resend Inbound webhook (signature verification via the Resend webhook secret; idempotency keyed on the `Message-ID` header so retries don't double-create cases). Resend Inbound is the primary path for the same reasons as outbound (Pre-flight 5 in phase-02: free tier, fast setup, swap to SES at scale).
+- ⬜ **P13.2** Email parsing pipeline — MIME parsing via `mailparser` (or similar), attachment streaming to the P4 attachments adapter, quoted-text + signature stripping, `In-Reply-To` / `References` header inspection so replies to existing cases route to the same case instead of creating a new one.
+- ⬜ **P13.3** Sender matching — lookup by sender email against `CustomerContact` (P2.3). Unmatched senders land in an unmatched-inbox queue at `/admin/email/unmatched` for engineer review and customer-contact promotion. The unmatched surface is a new admin widget (`UnmatchedEmailInbox`) that reuses the P2.1 widget-registry pattern.
+- ⬜ **P13.4** AI-assisted triage — `RetrievalService` (P7.7) finds similar open + historical cases (top 5 by similarity); P8.1 generates a draft case description from the email body + thread context; P9.4 suggests a priority; P9.5 flags duplicates if similarity to an existing open case crosses a threshold. All outputs land on the draft as `AiArtifact` recommendations (P8.3) — never auto-applied facts.
+- ⬜ **P13.5** Draft case workflow — `Case.status = DRAFT` (new enum value alongside OPEN / IN_PROGRESS / RESOLVED). Drafts surface as a `PendingEmailDrafts` admin widget. Engineer reviews the AI suggestions, edits the proposed fields, promotes to OPEN — and the original email is preserved as the first internal note. Promotion is the audit event that closes the loop.
+- ⬜ **P13.6** Tests + manual smoke — unit tests for parsing, sender matching, AI triage, draft promotion; manual smoke sends a real email to the dev inbound address and verifies the draft appears with similar-case suggestions, AI summary, and the email body as a note. Cross-tenant: an email addressed to Tenant A's inbox can never produce a case in Tenant B.
+
+**Acceptance criteria:**
+- [ ] Inbound email lands as a Case (status=DRAFT) within 30 seconds of receipt under normal load.
+- [ ] AI-suggested summary, priority, and similar-case list attached as `AiArtifact` rows (pending review).
+- [ ] No customer-facing response auto-sent — the AI never replies on behalf of an engineer.
+- [ ] Audit log captures every step: received → parsed → matched → triaged → draft-created → promoted (or rejected).
+- [ ] Cross-tenant isolation: a sender email targeted at Tenant A cannot create a draft case in Tenant B under any routing input.
+- [ ] Unrecognized senders land in `/admin/email/unmatched` without auto-creating a case.
+- [ ] Replies to existing cases (matched via `In-Reply-To` / `References`) append to the original case as notes, not new drafts.
+
+**Open decisions to resolve at start:**
+1. Inbound transport — Resend Inbound vs SES Inbound. Recommendation: Resend Inbound to match the outbound transport choice; SES Inbound deferred until the prod-hardening reasons that warranted SES outbound at P12 also apply inbound.
+2. Inbound address routing — single `inbox@in.caseflow.musto.io` with sender-domain → tenant mapping, vs per-tenant addresses (`tenant-slug@in.caseflow.musto.io`). Recommendation: per-tenant addresses — the address itself is the tenant routing key, no ambiguity, cross-tenant safety is automatic.
+3. AI auto-apply threshold — should P13.4's AI suggestions ever auto-apply (e.g., priority gets set automatically if confidence > 0.9)? Recommendation: never auto-apply at MVP; engineer review is the trust boundary, period.
+4. Spam handling — accept all inbound and let the engineer review queue absorb spam, vs add an upstream filter (e.g., Resend's spam-score header). Recommendation: trust Resend's spam score and reject above threshold; revisit if false-positive complaints surface.
+
+**Dependencies:** P2.3 (CustomerContact for sender matching), P2.1 (widget-registry pattern for the unmatched + draft surfaces), P4 (attachments), P7.7 (retrieval), P8.1 (AI summarization), P8.3 (artifact state machine), P9.4 (priority scoring), P9.5 (duplicate detection), P10.6 (CloudFront `/api/*` proxy for the webhook endpoint), P11 (observability — bounce + failure alarms).
+
+---
+
+## Phase 14 — Subscription & billing readiness 🎯 (stretch)
 
 **Goal.** If CaseFlow AI becomes a real SaaS, billing has to work. Stripe
 is the assumed integration. Plan limits + usage metering get enforced at
 the service layer.
 
 **Sub-phases & deliverables:**
-- ⬜ **P13.1** Stripe wiring — webhook endpoint with signature verification, `Subscription` entity per tenant, customer-portal handoff.
-- ⬜ **P13.2** Plan limits — config-driven caps (cases/month, AI invocations/month, attachments/GB), enforced in service layer with structured 402 responses.
-- ⬜ **P13.3** Usage metering — aggregate `AiInvocation` cost into a per-tenant monthly bucket; surface in admin dashboard.
+- ⬜ **P14.1** Stripe wiring — webhook endpoint with signature verification, `Subscription` entity per tenant, customer-portal handoff.
+- ⬜ **P14.2** Plan limits — config-driven caps (cases/month, AI invocations/month, attachments/GB), enforced in service layer with structured 402 responses.
+- ⬜ **P14.3** Usage metering — aggregate `AiInvocation` cost into a per-tenant monthly bucket; surface in admin dashboard.
 
 **Acceptance criteria:**
 - [ ] A tenant exceeding its plan gets blocked with a clear 402 error.
@@ -556,7 +621,7 @@ the service layer.
 
 ---
 
-## Phase 14 — Customer-facing client app 🎯 (stretch)
+## Phase 15 — Customer-facing client app 🎯 (stretch)
 
 **Goal.** A separate, lighter customer-facing workspace. Carries forward
 the [feature backlog](docs/roadmap.md)'s "Customer-Facing Client Application"
@@ -564,9 +629,9 @@ entry. **Deliberate exception to `CLAUDE.md` Do Not #6** — a third app
 surface requires confirmation, and this phase is that confirmation.
 
 **Sub-phases & deliverables:**
-- ⬜ **P14.1** New workspace `client/` — React + Vite scaffold, shares the existing axios client config but its own routing tree.
-- ⬜ **P14.2** Auth — magic-link email + claim-by-email (lighter than the engineer-side Google OAuth flow).
-- ⬜ **P14.3** Minimum surface — file a case (creates a customer-visible note + new case), view-my-cases, attach files.
+- ⬜ **P15.1** New workspace `client/` — React + Vite scaffold, shares the existing axios client config but its own routing tree.
+- ⬜ **P15.2** Auth — magic-link email + claim-by-email (lighter than the engineer-side Google OAuth flow).
+- ⬜ **P15.3** Minimum surface — file a case (creates a customer-visible note + new case), view-my-cases, attach files.
 
 **Acceptance criteria:**
 - [ ] A customer can self-serve from signup to case-filed without engineer intervention.
@@ -576,7 +641,7 @@ surface requires confirmation, and this phase is that confirmation.
 
 ---
 
-## Phase 15 — Plugin/module model + industry templates 🎯 (stretch)
+## Phase 16 — Plugin/module model + industry templates 🎯 (stretch)
 
 **Goal.** Carries forward "Phase 5 — Platform Expansion" from the legacy
 `sdlc-roadmap-requirements/docs/product/roadmap.md`. Turns CaseFlow AI
@@ -586,8 +651,8 @@ this is an architecture change, executed via this phase spec rather than
 a free-form refactor.
 
 **Sub-phases & deliverables:**
-- ⬜ **P15.1** Plugin interface — NestJS dynamic module pattern, plugins register entities, services, prompts, and frontend route bundles. Defined under `backend/src/plugins/` and `frontend/src/plugins/`.
-- ⬜ **P15.2** Two reference templates — `gov-contractor-support` (FOIA-style audit emphasis) and `saas-team-escalations` (PagerDuty-style on-call) — proving the plugin model isn't single-implementation theater.
+- ⬜ **P16.1** Plugin interface — NestJS dynamic module pattern, plugins register entities, services, prompts, and frontend route bundles. Defined under `backend/src/plugins/` and `frontend/src/plugins/`.
+- ⬜ **P16.2** Two reference templates — `gov-contractor-support` (FOIA-style audit emphasis) and `saas-team-escalations` (PagerDuty-style on-call) — proving the plugin model isn't single-implementation theater.
 
 **Acceptance criteria:**
 - [ ] Disabling a plugin removes its routes, entities, and frontend bundle without code changes outside config.
@@ -614,3 +679,9 @@ a free-form refactor.
 5. **Decision logs** land in `docs/decisions/phase-NN-<slug>.md` (mirrors
    Grid-Sensor-Pipeline). Each phase's "Where to look" entry points at its
    decision log once the phase opens.
+6. **Cross-cutting planning docs** land in `docs/planning/<slug>.md` and get
+   a row in the "Cross-cutting planning" table above. These aren't tied to a
+   single phase — they capture the design for foundational tooling or process
+   that touches every phase. When a planning doc promotes into a phase via
+   its §11 promotion path, update the table's status and link the spawned
+   dev-ready specs from the receiving phase's "Where to look" section.
