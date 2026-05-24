@@ -868,6 +868,152 @@ The wordmark now navigates back to `/` for every authenticated user. For ENGINEE
 
 ---
 
+## Pre-flight 12 — Endpoint shape: nested for parent-context operations, flat for individual contact operations
+
+**Date:** 2026-05-24 (P2.4 spec drafting — the most contested architectural call in P2.4).
+
+**Decision.** The customer-side REST surface is hybrid. Parent-context contact operations use nested URLs (`POST /customers/:orgId/contacts`, `GET /customers/:orgId/contacts`); individual contact operations use flat URLs (`GET /contacts/:contactId`, `PATCH /contacts/:contactId`). Org operations are all flat under `/customers/:orgId` since there's no parent context above the org (the tenant is implicit via JWT).
+
+```
+GET    /customers                                — list orgs in tenant
+POST   /customers                                — create org (ADMIN only)
+GET    /customers/:orgId                         — get one org
+PATCH  /customers/:orgId                         — update org (ADMIN only)
+GET    /customers/:orgId/contacts                — list contacts for org
+POST   /customers/:orgId/contacts                — create contact (ADMIN only)
+GET    /contacts/:contactId                      — get one contact
+PATCH  /contacts/:contactId                      — update contact (ADMIN only)
+```
+
+**Why hybrid.** The URL should express the relationship when the relationship is informative (creating a contact requires knowing which org it belongs to — nested URL makes that explicit) and stay quiet when the relationship is redundant (fetching a contact by UUID doesn't need the parent context, since UUIDs are globally unique). The middle path matches well-trodden REST conventions in mature APIs (Stripe, GitHub) where parent / child resources land here for exactly this reason.
+
+**Implementation note.** Two controllers, one service. `CustomersController` owns `/customers` + `/customers/:orgId/contacts`; `ContactsController` owns `/contacts/:contactId`. Both share `CustomersService` — Pre-flight 11's cross-row tenant invariant + composite-unique violation translation live in one place.
+
+**Alternative rejected — fully-nested URLs (`/customers/:orgId/contacts/:contactId`).** Forces every contact endpoint to surface the parent context, including reads that don't need it. Worse, it duplicates information already encoded in the contact's UUID — a `PATCH /customers/wrong-org-id/contacts/correct-contact-id` is ambiguous: do we ignore the org id, or 404 on the mismatch? The flat individual endpoints sidestep this entirely.
+
+**Alternative rejected — fully-flat URLs (`/contacts?customerOrganizationId=…` for list, `/contacts` for create with org id in body).** Hides the relationship from the URL. A reader can't tell from the path that contacts are scoped to orgs. The create-by-body shape also makes the "this contact belongs to this parent org" check feel like a special case rather than the obvious URL constraint.
+
+**Revisit if.** P14 customer-app exposes a customer-facing contact-management surface where the customer hierarchy is different (e.g., contacts belong to multiple orgs through a junction table). At that point, the relationship is no longer "contact belongs to exactly one org" and the URL shape changes accordingly. No P2.4-level pressure to anticipate that.
+
+**Cross-reference.** [`p2-4-customer-crud.md`](../../sdlc-roadmap-requirements/docs/tasks/dev-ready/p2-4-customer-crud.md) "API surface" + "Resolved pre-flight decisions"; Pre-flight 11 (the cross-row tenant invariant the shared service enforces); P13.3 sender matching (consumer of the `GET /contacts/:contactId` flat endpoint).
+
+---
+
+## Pre-flight 13 — No DELETE endpoint in P2.4
+
+**Date:** 2026-05-24 (P2.4 spec drafting — scope deferral with a well-bounded revisit trigger).
+
+**Decision.** P2.4 ships no DELETE endpoint for either `CustomerOrganization` or `CustomerContact`. The canonical "we don't do business with them anymore" path is `PATCH /customers/:id { status: 'INACTIVE' }`. Contact removal is also deferred — if a contact is no longer relevant, the engineer-facing UI in P2.7 may surface a delete affordance gated behind confirmation, or the contact may simply be left in place. No production path requires hard delete in P2.4.
+
+**Why defer.** Two reasons.
+
+1. *Cases haven't FK'd to customer orgs yet.* P2.5 adds `Case.customerOrganizationId`. The right delete strategy depends on what that FK's `onDelete` constraint is, and that decision lives in P2.5's spec. Designing the delete endpoint before the FK exists invites a Mid-flight when P2.5 makes the call. Deferring is the cheaper move.
+2. *Status-INACTIVE covers the only real lifecycle.* No portfolio-demo scenario actually requires hard delete. The status enum handles "remove from picker without losing history" — which is the universal answer for SaaS customer records (real CRMs almost never hard-delete customer rows for the same reason).
+
+**Alternative rejected — Add DELETE in P2.4, refuse if cases exist.** Workable but premature. The case-FK exists only after P2.5; before then, the DELETE endpoint has no real check to perform beyond "does the org exist." Adding it now produces an endpoint that does the wrong thing for ~30 minutes of clock time during the P2.4 → P2.5 transition.
+
+**Alternative rejected — Add DELETE in P2.4 with CASCADE.** The schema has `ON DELETE CASCADE` from `customer_contacts` to `customer_organizations`, so a hard delete of an org would automatically drop its contacts. Acceptable in isolation, but loses correspondent history with no obvious recovery path. Inconsistent with the project's "never tombstone" stance on User rows.
+
+**Revisit if.** A real product need surfaces (e.g., GDPR right-to-erasure once P12 prod hardening puts compliance gates in scope). At that point, the DELETE story includes audit-log entries, case-FK cascade strategy, and probably a soft-delete `deletedAt` column. Today none of that infrastructure exists.
+
+**Cross-reference.** [`p2-4-customer-crud.md`](../../sdlc-roadmap-requirements/docs/tasks/dev-ready/p2-4-customer-crud.md) "Out of scope"; P2.5 (the FK that this decision waits on); P12 prod hardening (the natural home for GDPR / audit-log + delete semantics).
+
+---
+
+## Pre-flight 14 — Primary contact denormalized fields are NOT auto-synced from `CustomerContact` writes
+
+**Date:** 2026-05-24 (P2.4 spec drafting — the runtime-binding decision Pre-flight 10 deferred to implementation).
+
+**Decision.** When a `CustomerContact` row is created or updated, the parent `CustomerOrganization`'s `primaryContactName` / `primaryContactEmail` / `primaryContactPhone` fields are NOT automatically modified. The denormalized fields are independent — set at org-create time (optionally auto-filled from the form's first contact entry), changed via explicit `PATCH /customers/:orgId` updates, and otherwise left alone. Pre-flight 10 (P2.3) accepted this drift as a feature, not a bug; P2.4 implements that explicitly by *not* writing a sync trigger.
+
+**Why no auto-sync.** Three reasons.
+
+1. *Pre-flight 10 already settled the architectural call.* The denormalized fields exist to serve a different purpose than the `customer_contacts` rows. Auto-syncing would conflate the two — once the org's "primary contact" line becomes a cached view of the first contact, the only-set-at-create-time semantics evaporate and we've effectively built an FK with extra steps.
+2. *Write amplification.* A contact update would have to propagate to potentially-stale org fields, requiring either a transaction or eventual-consistency machinery. Both are heavyweight for the actual product need.
+3. *Reader expectations stay clear.* The org's primary contact is the canonical at-a-glance summary, intentionally separate from the canonical correspondent list (`customer_contacts`). Anyone needing one or the other reads the right table. Mixing them via auto-sync breaks the mental model.
+
+**The "auto-fill from first contact" affordance.** The P2.7 create-org flow may offer a UI shortcut: when an engineer types a primary contact's name + email into the org form AND also adds them as the org's first contact, both surfaces should populate. That's a *one-shot fill at form submit*, not a runtime data binding. Same effect, fundamentally different semantics — and the right place for it is the UI layer, not the service layer. The P2.3 seed factory demonstrates the pattern (each org's primary fields are populated from its first contact spec at seed time, but the persisted rows are independent thereafter).
+
+**Alternative rejected — Auto-sync via a service-layer trigger.** When `createContact` runs and the parent org has null primary fields, copy this contact's fields up. Sounds harmless but creates surprising behavior: the second contact added would also fail to populate (org already has primaries), creating an asymmetry that depends on insert order. Worse: deletes (if added later) would orphan the org's primary fields without a clear "promote a different contact" handoff.
+
+**Alternative rejected — Auto-sync only when fields are null.** Same first-write-wins shape, slightly less surprising. Still loses to the "if you want the org's primary contact to track a contact row, use an FK" objection.
+
+**Revisit if.** Pre-flight 10 is revisited (i.e., the denormalized fields are lifted into an FK + role table). At that point, the new model has explicit semantics for "this contact is the primary" and the question goes away. Until then, no sync.
+
+**Cross-reference.** Pre-flight 10 (P2.3) — this Mid-flight is its runtime-binding completion; [`p2-4-customer-crud.md`](../../sdlc-roadmap-requirements/docs/tasks/dev-ready/p2-4-customer-crud.md) "Resolved pre-flight decisions"; P2.7 spec when it lands (the form-layer "auto-fill from first contact" affordance is a P2.7 implementation detail).
+
+---
+
+## Mid-flight 6 — Test-store reducer drift from production store
+
+**Date:** 2026-05-24 (P2.4 Chunk B implementation — caught by `tsc --noEmit` after the new `customersReducer` landed in `src/store/index.ts`).
+
+**Symptom.** Adding `customersReducer` to the production `configureStore({ reducer: { ... } })` map widened the global `RootState` type to include `customers: CustomersState`. Every Redux thunk in the codebase that closes over `state: RootState` (which is every `createAsyncThunk` with state injection) now expects any store it's dispatched against to carry `customers` in its state.
+
+Two pre-existing test files broke as a result:
+
+- `frontend/src/features/users/usersSlice.test.ts` (10 dispatch sites): `Argument of type 'AsyncThunkAction<…>' is not assignable to parameter of type 'UnknownAction'.`
+- `frontend/src/features/admin/widgets/PendingApprovalUsers.test.tsx` (1 dispatch via render): same root error.
+
+Both test files build a local `configureStore({ reducer: { auth: …, users: … } })` that omits `customers`. The thunks they dispatch (`fetchUsersThunk`, `updateUserStatusThunk`) require `state: RootState` — a state shape with `customers` in it. The local stores don't satisfy that shape, so TypeScript rejects the dispatch.
+
+Two other test files were untouched because they don't dispatch RootState-constrained thunks: `RequireRole.test.tsx` (renders a route gate with `useAppSelector` only) and `TourEngine.test.tsx` (already includes the relevant slices).
+
+**Root cause.** A reducer-map drift between the production store and per-test stores. When `RootState` is computed from the production store (`ReturnType<AppStore['getState']>`), every thunk inherits a "the state must look like this" constraint, but per-test stores can omit slices they don't exercise. Most of the time the omission is harmless — the thunk doesn't actually read the omitted slice. But the *type* doesn't know that, so TypeScript rejects the dispatch regardless.
+
+**Fix.** Added `customers: customersReducer` to the two drifted test stores. Three lines of edit per file plus an import. The thunks dispatch cleanly and the tests behave identically — no runtime change in either suite.
+
+**Why this rises to a Mid-flight.** The drift isn't a bug in either the production store or the test stores in isolation — both are internally consistent. The bug is in the *coupling*: the production store dictates `RootState`, and every test store has to mirror it. Future contributors adding a new slice will hit the same fail-to-typecheck pattern unless they know to update every test store too. The fix path (a) needs to be documented, and (b) is a candidate for the contributor-framework's planned `verify.yml` lint job — a check that every test-store reducer set is a superset of the production set (or at least a comment marker for intentional omissions).
+
+**Going forward.**
+
+- Any future sub-phase adding a new slice to `src/store/index.ts` must update every test store with a local `configureStore` to include the new reducer. The pattern is mechanical but easy to miss without `tsc --noEmit` as a gate.
+- The contributor-framework's planned `verify.yml` ([`docs/planning/contributor-framework.md`](../planning/contributor-framework.md) §4) should add this check — either as a custom lint rule or via `tsc --noEmit` failing the CI on any test-store drift.
+- A small `makeTestStore()` helper in `frontend/src/test-utils/` would centralize this: a function that constructs a store with all production reducers and accepts a `Partial<RootState>` preload. New contributors would use the helper by default. The helper deferred to its own follow-up sub-phase to keep this Mid-flight bounded — but tracked as a follow-up TODO.
+- Same family as P1 Mid-flight 9 (proxy-allowlist drift between vite.config.ts and CloudFront) and Mid-flight 7 below — a recurring "two places agree by convention, not by contract" footgun.
+
+**What this isn't.** This is not a Redux design problem. The `state: RootState` constraint is correct — thunks SHOULD know about the full state shape they can read from. The fix isn't to weaken the constraint; it's to make the test-store / production-store coupling explicit.
+
+**Cross-reference.** P1 Mid-flight 9 (same family of drift, different surface); Mid-flight 7 below (same family, third occurrence inside ~2 weeks); [`docs/planning/contributor-framework.md`](../planning/contributor-framework.md) §4 (planned verify.yml hook that would catch this).
+
+---
+
+## Mid-flight 7 — Proxy / CDN allowlist drift (P1 Mid-flight 9 strikes again)
+
+**Date:** 2026-05-24 (P2.4 Chunk B local smoke — admin page rendered blank, console showed `items.filter is not a function` at `customersSlice.ts`).
+
+**Symptom.** After landing the P2.4 backend + frontend wiring, navigating to `localhost:8080/admin` produced a blank page and the console error `Uncaught TypeError: items.filter is not a function` at `selectActiveCustomerOrgs` in `customersSlice.ts`. The selector calls `items.filter(...)`, which requires `items` to be an array. The actual `items` value was the body of Vite's `index.html` fallback HTML response — not an array — because the dev server had no proxy entry for `/customers` and silently served the SPA bundle instead of forwarding to the NestJS backend.
+
+**Root cause.** Identical to P1 **Mid-flight 9** (`/tour-state` proxy drift, 2026-05-19). Every new backend resource needs three touchpoints:
+
+1. *NestJS controller* — the source of the route. P2.4 ships `CustomersController` at `/customers` + `ContactsController` at `/contacts`.
+2. *Vite proxy entry* — `frontend/vite.config.ts` `server.proxy[...]`. Missing entry means Vite returns the SPA HTML on every path that doesn't match a known static asset.
+3. *CloudFront ordered cache behavior* — `infra/modules/frontend_cdn/main.tf`. Missing behavior means the deployed dev environment serves S3's SPA fallback instead of forwarding to the ALB.
+
+P2.4 added the controllers (item 1). Items 2 and 3 silently fell through. Locally, item 2 was the visible break; item 3 would only have surfaced when the admin page is loaded against the deployed `caseflow.musto.io` environment.
+
+**Why the existing Mid-flight 9 warning didn't prevent it.** `vite.config.ts` already carries an inline comment block — `⚠ Allowlist drift gotcha (Mid-flight 9): every new backend resource prefix needs a line here AND a matching CloudFront behavior…`. The footgun still fired. That's the strongest possible signal that *comments are not a lint check*. The contributor-framework's planned `verify.yml` ([`docs/planning/contributor-framework.md`](../planning/contributor-framework.md) §4) is the real fix: a CI step that diffs every `@Controller('X')` in the NestJS codebase against the proxy + CloudFront allowlists and fails the build on mismatch.
+
+**Fix.** Three touchpoints rectified.
+
+1. **Vite proxy** — `/customers` added (Armando, during local smoke). `/contacts` added at close-out (no P2.4 frontend consumer yet — the engineer-facing contact UI lands in P2.7 — but landing the entry now means P2.7 doesn't have to rediscover the same footgun).
+2. **CloudFront behaviors** — two new ordered behaviors in `infra/modules/frontend_cdn/main.tf`: `/customers*` and `/contacts*`. Pattern matches the `/users*` and `/tour-state*` precedent set by Mid-flight 11 in phase-01 (bare-resource matching requires `*` without leading slash, see P1 Mid-flight 11 for the diagnostic). Both behaviors land before P2.5 ships; the deployed dev environment needs a `terragrunt apply -auto-approve` in `infra/live/dev/frontend_cdn` to pick them up.
+3. **This decision log entry** — making the third occurrence (P1.7 was the first against `/tour-state`, P2.4's `/customers` is the second, P2.4's `/contacts` is the third) visible enough that the contributor-framework promotion catches it.
+
+**Why this Mid-flight, not just an amendment to P1 Mid-flight 9.** Mid-flight 9 documented the footgun. This Mid-flight documents that the footgun fires again under the existing mitigation (inline warning comments). The take-away has shifted from "be careful" to "automate the check." The two entries serve different purposes; the second one is what justifies the lint-rule investment.
+
+**Going forward.**
+
+- The contributor-framework promotion ([`docs/planning/contributor-framework.md`](../planning/contributor-framework.md)) should add an explicit dev-ready sub-task: a `verify.yml` step that reads every `@Controller('…')` decorator path in `backend/src/` and asserts it has a matching entry in both `frontend/vite.config.ts` proxy and `infra/modules/frontend_cdn/main.tf` ordered_cache_behavior. Drift fails the CI.
+- When that lint rule lands, *both* Mid-flight 9 and Mid-flight 7 reference the rule as the canonical fix. The inline comments in vite.config.ts can be replaced with a one-line pointer.
+- Any future contributor adding a new top-level NestJS controller path is the audience for the lint rule. The cost of the rule is small; the cost of each Mid-flight (debugging + decision-log entry + redeploy) is meaningful.
+
+**What this isn't.** This is not a NestJS / Vite / CloudFront design problem. All three tools work as documented. The bug is the absent contract between them — three configuration surfaces that have to agree about which paths exist on the backend, with no shared source of truth today.
+
+**Cross-reference.** P1 Mid-flight 9 (the original); P1 Mid-flight 11 (the `/resource*` vs `/resource/*` pattern within CloudFront); Mid-flight 6 above (same family — "two places agree by convention" footgun); [`docs/planning/contributor-framework.md`](../planning/contributor-framework.md) §4 (the planned lint rule).
+
+---
+
 ## How this file is updated
 
 1. Pre-flight decisions are written before any sub-phase code lands.
