@@ -756,6 +756,118 @@ Anywhere the upstream promise is guaranteed by its type signature to resolve (e.
 
 ---
 
+## Pre-flight 9 — Customer module structure: one `CustomersModule` housing both entities
+
+**Date:** 2026-05-24 (P2.3 spec drafting — locking in the module shape before the entities land).
+
+**Decision.** `CustomerOrganization` and `CustomerContact` live in a single feature module at `backend/src/customers/`. The module's `TypeOrmModule.forFeature([CustomerOrganization, CustomerContact])` registers both; P2.4's `CustomersService` + `CustomersController` will own both entities' CRUD; P2.7's frontend `features/customers/` mirrors the same coupling. P2.3 ships the module with empty `providers: []` and `controllers: []` arrays — the entities + the module shell only — because the controller and service work belongs in P2.4 where it can be reviewed alongside its DTOs and tests.
+
+**Why one module.** The two entities are parent/child and joined on nearly every query of interest:
+
+- "list contacts for this organization"
+- "list orgs with their primary contact denormalized" (well, that's covered by Pre-flight 10's denormalization, but the join would otherwise be required)
+- "list contacts in this tenant" (joins both)
+- "find the org that owns this contact's email" (P13 sender matching)
+
+Two modules that need each other's services would force either a circular import (paired `forwardRef`, like the Users ↔ Notifications case in P2.2 — but with no benefit here) or a third "shared" module that holds both — which is the single-module decision with extra steps. Single module is the cleaner shape.
+
+**Alternative rejected — split into `CustomerOrganizationsModule` + `CustomerContactsModule`.** Defensible on "one module per entity" grounds, but the cost shape is wrong: every cross-entity feature pays an indirection tax, and the architectural story ("our customer-side data model") fragments across two folders for zero gain.
+
+**Alternative rejected — fold into `UsersModule`.** `User` and `CustomerContact` are both "people-ish" rows, but they answer different questions (authentication subject vs. customer-side correspondent) and have different lifecycle, retention, and PII concerns. Folding them invites conflation. Separate modules with clear boundaries beats one module with a mixed concept.
+
+**Revisit if.** Either entity grows enough sub-concepts that splitting would aid reasoning. Plausible triggers: `CustomerOrganization` accumulating contracts, billing addresses, tags, SLA tiers, etc. The split would be additive — the existing entities stay where they are; new sub-entities land in new sub-modules that the existing one imports.
+
+**Cross-reference.** [`p2-3-customer-entities.md`](../../sdlc-roadmap-requirements/docs/tasks/dev-ready/p2-3-customer-entities.md) "Resolved pre-flight decisions"; existing `UsersModule` (similar single-module shape housing the auth-subject identity + its refresh tokens via `AuthModule` next-door).
+
+---
+
+## Pre-flight 10 — Primary contact: denormalized fields on `CustomerOrganization`, not an FK to `CustomerContact`
+
+**Date:** 2026-05-24 (P2.3 spec drafting — the highest-value contested architectural call in P2.3).
+
+**Decision.** `CustomerOrganization` carries `primaryContactName`, `primaryContactEmail`, and `primaryContactPhone` directly as nullable `varchar` columns. There is no `primaryContactId` FK pointing into `customer_contacts` in P2.3. The denormalized fields can be populated from any of: a user-typed value at org-create time (most common in P2.4's UI), an auto-fill from the first `CustomerContact` row, or an explicit "set as primary" action on a contact (P2.7-ish).
+
+**Why denormalize.** Three reasons.
+
+1. *Chicken-and-egg.* A customer org can plausibly exist before any individual contact is entered (sales handoff: "we just signed Acme; details to follow"). Requiring a `CustomerContact` row before the org can be saved adds awkward two-step creation flows or forces stub contacts that are worse than denormalized strings.
+2. *List-view performance.* The admin widget and engineer list view show the org name + primary contact at a glance. Denormalization makes that a single-table scan; the FK alternative requires a left join on every list query. At P2.4's scale, the join is cheap — at P11's scale, denormalization stays cheap.
+3. *Edit ergonomics.* Updating "the primary contact's email" via a contact row creates a write-amplification expectation (write to `customer_contacts`, propagate to `customer_organizations.primaryContactEmail`). Denormalization makes the two writes independent and lets the org's "primary contact" line carry a freely-typed value when the contact isn't a system-of-record entry yet.
+
+**The cost we accept.** Drift risk: if a `CustomerContact` row's email changes, the `CustomerOrganization.primaryContactEmail` may go stale. Mitigation: P2.4's update flow exposes both as separately-editable fields. The "primary contact" line on the org is the canonical at-a-glance summary; the `customer_contacts` rows are the canonical correspondent list. They serve different purposes; drift between them is acceptable. The P2.3 seed factory reinforces this — it auto-fills the org's `primaryContact*` fields from each org's first contact at seed time, but those values are independent rows once persisted.
+
+**Alternative rejected — `primaryContactId` UUID FK into `customer_contacts`.** Defers the at-a-glance display problem to a join, and creates the chicken-and-egg constraint above. Cleaner normalization at the cost of every consumer paying the join tax and the create-flow complexity. The FK approach also forces a "which `CustomerContact` is the primary?" UI decision into every contact-create form — premature commitment to a UX pattern P2.4 hasn't even drafted yet.
+
+**Alternative rejected — JSON column with the full contact blob.** Considered briefly. Loses the type safety of typed columns and the indexability of `primaryContactEmail` — P13's email-in sender matching (per the ROADMAP) wants `CustomerContact.email` as the primary match; a queryable `primaryContactEmail` is also useful as a fallback when an inbound email doesn't match any individual contact but does match an org's primary address.
+
+**Revisit if.** The "primary contact" notion grows from a single denormalized line into a richer concept (e.g., "primary billing contact," "primary technical contact," "primary escalation contact"). At that point, lifting into a proper FK + role table (`customer_organization_primary_contacts` with `role` enum) is the right move, and the denormalized columns either go away or become a cached "default contact" view. The denormalization is sized to the current product story — single line, single purpose; the lift to a richer model is well-bounded when the richer story emerges.
+
+**Cross-reference.** [`p2-3-customer-entities.md`](../../sdlc-roadmap-requirements/docs/tasks/dev-ready/p2-3-customer-entities.md) "Resolved pre-flight decisions" + "Schema" tables; P2.3 seed factory (`backend/src/seed/factories/customer-organizations.factory.ts`) demonstrates the "auto-fill from first contact" pattern; P13.3 (email-in sender matching) consumes both `CustomerContact.email` and the org's `primaryContactEmail` as fallback.
+
+---
+
+## Pre-flight 11 — `CustomerContact` email uniqueness scoped to the customer organization
+
+**Date:** 2026-05-24 (P2.3 spec drafting — the grain decision for the uniqueness index).
+
+**Decision.** `customer_contacts.email` is uniqueness-scoped via a composite unique index on `(customerOrganizationId, email)`. Two different customer orgs can each have a contact with the same email address (legitimate: a consultant working with multiple client orgs). One customer org cannot have the same email listed twice. Tenant scope is enforced separately via a denormalized `tenantId` column + `(tenantId)` index on `customer_contacts` — the composite unique is the uniqueness rule, the tenant index is the query-perf rule. They serve different purposes and don't conflict. Email is stored lowercased (P2.4 service-layer concern; same pattern as `users.email`), so the unique index is effectively case-insensitive without needing a `LOWER(email)` expression index.
+
+**Why org-scoped (not tenant-scoped, not global).**
+
+- *Global unique on `email`* would prevent the consultant case (same address, two different client orgs). It would also create cross-tenant collision potential — Tenant A's customer's email refuses to insert because Tenant B's customer happens to have the same address. That's wrong: the two tenants don't share a customer namespace, and a customer's email isn't a system-level identifier.
+- *Tenant-scoped unique on `(tenantId, email)`* would prevent one of your tenant's customer orgs from listing a contact that also exists at another of the same tenant's customer orgs. Defensible but restrictive: a consulting tenant managing multiple end-client orgs would constantly hit this collision for shared contacts.
+- *Org-scoped unique on `(customerOrganizationId, email)`* matches how contacts are mentally used: "this person represents Acme in dealings with us." Two Acme records with the same email is a duplicate-row bug; the same email at Acme and at Globex is two correspondents in two relationships.
+
+**The denormalized `tenantId` column.** P2.3 follows the existing project pattern (`cases`, `users` all carry `tenantId` denormalized) — every tenant-scoped query is a single-table scan; no join through the parent org just to filter by tenant. The DB cannot enforce cross-row consistency natively: a contact with `tenantId = A` could be inserted under a `customerOrganizationId` whose parent has `tenantId = B`. P2.4's service layer enforces the invariant by reading the parent org's tenant before insert; P2.3 documents the invariant in the entity's class-level docstring so a future contributor doesn't bypass the service layer without realizing.
+
+**Alternative rejected — global unique on `email`.** See above. Wrong scope.
+
+**Alternative rejected — tenant-scoped unique `(tenantId, email)`.** See above. Defensible but restrictive.
+
+**Alternative rejected — application-only uniqueness (no DB index, service layer checks).** The composite unique constraint is the safety net when application-layer logic is bypassed (direct DB writes, future migrations, seed scripts). At P12 prod hardening's audit pass, having the constraint at the schema layer makes the SOC II "we enforce uniqueness" story trivial to demonstrate; without it, the story leans entirely on app-layer correctness.
+
+**Revisit if.** The email-in surface (P13.3) needs to match an inbound email to exactly one `CustomerContact` and the org-scoped unique allows ambiguity (the same address appears under two orgs in the same tenant). At that point, the match algorithm becomes "by email + most-recently-corresponded org" or similar; the index doesn't change but the resolution rule grows. The P2.3 seed factory currently keeps every fixture email globally unique to dodge the ambiguity until P13 has a forcing function.
+
+**Cross-reference.** [`p2-3-customer-entities.md`](../../sdlc-roadmap-requirements/docs/tasks/dev-ready/p2-3-customer-entities.md) "Resolved pre-flight decisions" + "Schema" tables; Pre-flight 12 in [`phase-01-multi-tenancy-auth.md`](phase-01-multi-tenancy-auth.md) (404-not-403 cross-tenant safety, same family of tenant-boundary invariant); P1.5 tenant-scoped queries (the existing pattern this Pre-flight extends); P13.3 sender matching (downstream consumer of this uniqueness rule).
+
+---
+
+## Mid-flight 5 — `Layout.tsx` wordmark becomes a "back to /" link
+
+**Date:** 2026-05-24 (P2.3 implementation — small UX polish noticed during the Chunk B seed-extension review).
+
+**Symptom.** With P2.1's Admin link in the AppBar, navigating between `/` and `/admin` was asymmetric: the Admin button took ADMINs forward to `/admin`, but there was no obvious "back to dashboard" affordance. The `{env.SITE_NAME}` wordmark in the AppBar's title slot was rendered as plain `<Typography>` text — not a link — so the conventional "click the brand to go home" pattern wasn't available.
+
+**Fix.** Wrap the wordmark in a `<Button component={RouterLink} to="/" color="inherit">`:
+
+```tsx
+// frontend/src/components/Layout/Layout.tsx
+<Typography variant="h6" component="h1" sx={{ flexGrow: 1 }}>
+  <Button component={RouterLink} to="/" color="inherit">
+    {env.SITE_NAME}
+  </Button>
+</Typography>
+```
+
+The wordmark now navigates back to `/` for every authenticated user. For ENGINEER + ADMIN the destination is the Engineer Dashboard (P1.8); for CUSTOMER it's the existing `<Home />` placeholder via `<DashboardRouter />` (P14 customer-app stretch will replace this with a real customer surface). The button inherits the AppBar's color via `color="inherit"`, so the visual treatment matches the existing surrounding "Admin" and "Sign out" buttons rather than introducing a third visual rhythm.
+
+**Why this rises to a Mid-flight (not just a styling commit).** Three reasons.
+
+1. *Navigation affordances are shared infrastructure.* `Layout.tsx` is rendered for every authenticated route — every future sub-page inherits this behavior whether it asks for it or not. Future contributors adding admin sub-pages (P2.4+) or customer-facing surfaces (P14) need to know the brand is a back-to-root affordance so they don't accidentally re-implement it elsewhere.
+2. *The asymmetry is what made the fix obvious.* P2.1 added a forward-nav button (`Layout.tsx` Admin link); P2.3's customer-model work made the Admin section's growing surface visible (P2.4's customer widget lands next), which surfaces the missing back-nav. The Mid-flight captures the design pattern — "every forward-nav from the dashboard gets a paired back-nav, and the brand wordmark is the canonical back-to-`/` path" — so the next contributor adding a sub-route knows whether to repeat the pattern or rely on the brand.
+3. *Conventional pattern made explicit.* "Click the brand to go home" is web-wide convention, but conventions only work when they're consistent. Documenting the call now (rather than letting it sit as an undocumented behavior) means the pattern survives styling refactors — anyone touching `Layout.tsx` later sees the link wrapper exists for a reason.
+
+**Going forward.**
+
+- Any future top-level navigation surface (P14 customer-app's customer-facing layout) inherits the same pattern: the brand wordmark is the home link. If a future product surface wants the wordmark to mean something else (e.g., a multi-product top-level switcher), that's its own Mid-flight.
+- The `data-tour-id` namespace doesn't currently identify the wordmark link. If a future tour needs to anchor a step on "click the brand to go home," add `data-tour-id="layout.brand-link"` to the button at that time.
+- `<RouterLink>` inside `<Button>` is the canonical "Button-styled link" pattern used elsewhere in `Layout.tsx` (the Admin button uses the same shape). Using a plain `<a>` would skip MUI's button styling; using `<Link>` without the button wrapper would skip the AppBar's button visual rhythm.
+
+**What this isn't.** This is not a navigation refactor. The route map (`App.tsx`) doesn't change. The wrapper components (`RequireRole`, `RequireActiveAuth`) don't change. Only the AppBar's visual treatment of the wordmark — from plain text to a button-styled link — changes. The behavior is purely additive: clicking the wordmark used to do nothing; now it goes to `/`.
+
+**Cross-reference.** P2.1 Layout.tsx (the Admin button — the forward-nav this Mid-flight pairs); Pre-flight 4 (route gating shape — the wordmark link still passes through `<RequireActiveAuth />` and `<RequireRole />` as defined there); `frontend/src/features/tours/README.md` (data-tour-id conventions, in case a future tour anchors on the brand).
+
+---
+
 ## How this file is updated
 
 1. Pre-flight decisions are written before any sub-phase code lands.
